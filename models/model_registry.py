@@ -21,14 +21,20 @@ class ModelInfo:
             "tags": self.tags,
         }
 
-    def check_paths(self):
+    def check_paths(self, raise_error: bool = False) -> bool:
         if not os.path.exists(self.weights_path) and not os.path.exists(self.configs_path):
-            raise FileNotFoundError(
-                f"Both weights and configs paths do not exist: {self.weights_path}, {self.configs_path}")
+            if raise_error:
+                raise FileNotFoundError(
+                    f"Both weights and configs paths do not exist: {self.weights_path}, {self.configs_path}")
+            return False
         elif not os.path.exists(self.weights_path):
-            raise FileNotFoundError(f"Weights path does not exist: {self.weights_path}")
+            if raise_error:
+                raise FileNotFoundError(f"Weights path does not exist: {self.weights_path}")
+            return False
         elif not os.path.exists(self.configs_path):
-            raise FileNotFoundError(f"Configs path does not exist: {self.configs_path}")
+            if raise_error:
+                raise FileNotFoundError(f"Configs path does not exist: {self.configs_path}")
+            return False
         else:
             return True
 
@@ -47,7 +53,13 @@ class ModelRegistry:
             raise KeyError(f"Model with identifier {identifier_str} is not registered.")
         return self.models[identifier_str]
 
-    def list_models(self):
+    def check_model(self, identifier_str: str) -> bool:
+        model = self.get_model(identifier_str)
+        return model.check_paths()
+
+    def list_models(self, only_available: bool = True) -> list[ModelInfo]:
+        if only_available:
+            return [model for model in self.models.values() if model.check_paths()]
         return list(self.models.values())
 
 
@@ -56,7 +68,7 @@ MODEL_REGISTRY.register_model(ModelInfo(
     identifier_str="sam2_tiny",
     name="SAM2 Tiny",
     description="Segment Anything Model 2 - Tiny version",
-    weights_path="models/sam2_tiny/sam2_tiny.pth",
+    weights_path="./sam2_tiny/sam2_tiny.pth",
     configs_path="models/sam2_tiny/sam2_tiny.yaml",
     tags=["Sam2", "Tiny", "Fast", "General Purpose"]
 ))
