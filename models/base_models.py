@@ -1,15 +1,10 @@
-from models.model_registry import ModelInfo
+from app.schemas.segment_2D import Prompted2DSegmentationRequest
+from abc import ABC, abstractmethod
 
 
-class Prompted2DBaseModel:
-    def __init__(self, model_info, device: str = "auto"):
-        # Initialize model parameters here
-        pass
-
-    def set_image(self, image):
-        # Placeholder for setting the image in the model. This enables caching the image.
-        pass
-
-    def segment(self, prompts: Prompts):
-        # Placeholder for segmentation logic
+class Prompted2DBaseModel(ABC):
+    """ Abstract base class for 2D prompted segmentation models. """
+    @abstractmethod
+    def process_prompted_request(self, request: Prompted2DSegmentationRequest):
+        # Process the prompted segmentation request
         pass

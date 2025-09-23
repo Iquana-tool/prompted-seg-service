@@ -1,4 +1,5 @@
 import cv2
+import torch.cuda
 
 from models.base_models import Prompted2DBaseModel
 from models.model_registry import ModelInfo
@@ -9,32 +10,39 @@ import numpy as np
 from sam2.build_sam import build_sam2 as build, build_sam2_video_predictor
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.sam2_video_predictor import SAM2VideoPredictor
+from paths import *
+
+
+def load_sam2_model(weights: str, config:str, device='auto'):
+    """ Load the SAM2 model based on the provided model information.
+    :param weights: Path to the model weights.
+    :param config: Path to the model config file.
+    :param device: Device to run the model on. 'auto' will use GPU if available, otherwise CPU.
+    :return: An instance of SAM2Prompted model.
+    """
+    return SAM2Prompted(weights=weights, config=config, device=device)
 
 
 class SAM2Prompted(Prompted2DBaseModel):
-    def __init__(self,  model_info: ModelInfo, device='auto'):
-        """ Initialize the prompted SAM2 model.
-            Args:
-                path_to_weights (str): Path to the model weights file.
-                path_to_config (str): Path to the model configuration file.
-                device (str): The device to run the model on. Can be 'cpu', 'cuda', or 'auto'.
+    def __init__(self,  weights, config, device='auto'):
         """
-        super().__init__(model_info, device)
-        self.model_info = model_info
-        self.device = device
-        self.model = build(ckpt_path=model_info.weights_path,
-                           config_file=model_info.configs_path,
+        Initialize the prompted SAM2 model.
+        :param weights: Path to the model weights.
+        :param config: Path to the model config file.
+        :param device: Device to run the model on. 'auto' will use GPU if available, otherwise CPU.
+        """
+        self.device = device if device != 'auto' else ('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = build(ckpt_path=weights,
+                           config_file=config,
                            device=self.device)
         self.prompt_predictor = SAM2ImagePredictor(self.model)
         self.set_image = None # To track the current image being processed
 
-    def process_prompted_request(self, request: Prompted2DSegmentationRequest) -> tuple[np.ndarray, np.ndarray]:
-        """ Process the prompted_segmentation request.
-            Args:
-                request (PromptedSegmentationRequest): The prompted_segmentation request containing the image and prompts.
-
-            Returns:
-                tuple: A tuple containing an array of masks and an array of predicted iou scores.
+    def process_prompted_request(self, request: Prompted2DSegmentationRequest):
+        """
+        Process the prompted_segmentation request.
+        :param request: The prompted_segmentation request containing the image and prompts.
+        :return: A tuple containing an array of masks and an array of predicted iou scores.
         """
         prompts = Prompts()
         prompts.from_segmentation_request(request)
