@@ -1,5 +1,4 @@
 # This file contains classes for prompts
-import cv2
 import numpy as np
 from logging import getLogger
 from app.schemas.segment_2D import Prompted2DSegmentationRequest
@@ -94,40 +93,13 @@ class Prompts:
         """ Add a polygon prompt to the list of prompts. The polygon vertices should be in the format [(x1, y1), (x2, y2), ...].
             Every point enclosed by the polygon will be treated as a positive annotation.
         """
-        max_x = np.max([v[0] for v in vertices])
-        min_x = np.min([v[0] for v in vertices])
-        max_y = np.max([v[1] for v in vertices])
-        min_y = np.min([v[1] for v in vertices])
-        grid_size = 4  # Define the grid size for sampling
-        contour = (np.array(vertices) * 1000).astype(np.int32)  # Scale vertices to pixel coordinates
-        # Create a box annotation around the polygon to sample points
-        # and add negative annotations for points outside the polygon
-        self.add_box_annotation(min_x, min_y, max_x, max_y)
-        for point_x in np.arange(min_x, max_x, (max_x - min_x) / grid_size):
-            for point_y in np.arange(min_y, max_y, (max_y - min_y) / grid_size):
-                # Check if the point is inside the circle
-                if cv2.pointPolygonTest(contour, (point_x * 1000, point_y * 1000), False) <= 0:
-                    self.add_point_annotation(point_x, point_y, 0)
+        raise NotImplementedError
 
     def add_circle_annotation(self, x: float, y: float, radius: float):
         """ Add a circle prompt to the list of prompts. The circle prompt will add a positive annotation for all points
             within the circle.
         """
-        # We create a slightly large circle to avoid edge effects when sampling points
-        # Then we lay a grid over the circle and check if the points are inside the circle
-        grid_size = 4  # Define the grid size for sampling
-        min_x = max(0, x - radius)
-        min_y = max(0, y - radius)
-        max_x = min(1, x + radius)
-        max_y = min(1, y + radius)
-        # Create a box annotation around the polygon to sample points
-        # and add negative annotations for points outside the polygon
-        self.add_box_annotation(min_x, min_y, max_x, max_y)
-        for point_x in np.arange(min_x, max_x, (max_x - min_x) / grid_size):
-            for point_y in np.arange(min_y, max_y, (max_y - min_y) / grid_size):
-                # Check if the point is inside the circle
-                if ((point_x - x) ** 2 + (point_y - y) ** 2) <= radius ** 2:
-                    self.add_point_annotation(point_x, point_y, 0)
+        raise NotImplementedError
 
     def get_prompts_as_ndarray(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """ Get the prompts as numpy arrays. The returned arrays should be used as input to the SAM2 model.
@@ -161,32 +133,3 @@ class Prompts:
             return_dict['box'] = box_prompts
         logger.debug(f"Converted prompts to SAM2 input: {return_dict}")
         return return_dict
-
-    @staticmethod
-    def convert_polygon_vertices_to_point_annotations(vertices: list[list[float]]) -> list[tuple[int, int]]:
-        """ Convert a list of polygon vertices to a list of point annotations. The polygon vertices should be in the
-            format [(x1, y1), (x2, y2), ...]. Every point enclosed by the polygon will be treated as a positive
-            annotation. The method will return a dictionary with two keys: True and False. The
-            True key will contain the positive annotations, and the False key will contain the negative annotations.
-            The method will return the points as integer coordinates."""
-        positive_annotations = []
-        # Create an empty canvas and plot the polygon on it
-        canvas = np.zeros((1000, 1000))
-        polygon = np.array(vertices) * 1000
-        canvas = cv2.fillPoly(canvas, [polygon.astype(dtype=np.int32)], 1)
-        # Compute the general span of the polygon to identify the samnpling frequency
-        min_x = min(polygon[:, 0])
-        min_y = min(polygon[:, 1])
-        max_x = max(polygon[:, 0])
-        max_y = max(polygon[:, 1])
-        stretch_x = max_x - min_x
-        stretch_y = max_y - min_y
-        # We want about 3 points per row and column to be sampled
-        sampling_freq_x = int(stretch_x / 3)
-        sampling_freq_y = int(stretch_y / 3)
-        # Find all points enclosed by the polygon
-        for x in range(int(min_x), int(max_x), sampling_freq_x):
-            for y in range(int(min_y), int(max_y), sampling_freq_y):
-                if canvas[y, x] == 1:
-                    positive_annotations.append((x / 1000, y / 1000))
-        return positive_annotations
