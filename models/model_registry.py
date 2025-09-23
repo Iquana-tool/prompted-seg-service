@@ -1,3 +1,9 @@
+from logging import getLogger
+
+
+logger = getLogger(__name__)
+
+
 class ModelLoader:
     def __init__(self, loader_function, **kwargs):
         """
@@ -74,6 +80,7 @@ class ModelRegistry:
             raise ValueError(f"Model loader with identifier {model_info.identifier_str} is already registered.")
         self.model_infos[model_info.identifier_str] = model_info
         self.model_loaders[model_info.identifier_str] = model_loader
+        logger.info(f"Registered model {model_info.identifier_str}. Model is loadable: {model_loader.is_loadable()}")
 
     def get_model_info(self, identifier_str: str) -> ModelInfo:
         """Get the model information for the given identifier."""
@@ -105,17 +112,3 @@ class ModelRegistry:
     def load_model(self, identifier_str: str):
         """Load the model with the given identifier."""
         return self.get_model_loader(identifier_str).load_model()
-
-
-MODEL_REGISTRY = ModelRegistry()
-MODEL_REGISTRY.register_model(
-    model_info=ModelInfo(
-        identifier_str="sam2_tiny",
-        name="SAM2 Tiny",
-        description="Segment Anything Model 2 - Tiny version",
-        tags=["Sam2", "Tiny", "Fast", "General Purpose"],),
-    model_loader=ModelLoader(
-        loader_function=lambda weights_path, configs_path: f"Loading model with weights from {weights_path} and configs from {configs_path}",  # Placeholder for now
-        weights_path="models/sam2_tiny/sam2_tiny.pth",
-        configs_path="models/sam2_tiny/sam2_tiny.yaml")
-)
