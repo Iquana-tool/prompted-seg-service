@@ -1,6 +1,9 @@
 from os import getenv
 
+# General paths
+LOG_DIR = getenv("LOG_DIR", "logs")
 
+# Weights and configs paths
 SAM2_TINY_WEIGHTS = getenv("SAM2_TINY_WEIGHTS", "weights/sam2.1_hiera_tiny.pt")
 SAM2_TINY_CONFIG = getenv("SAM2_TINY_CONFIG", "configs/sam2.1_hiera_tiny.yaml")
 SAM2_SMALL_WEIGHTS = getenv("SAM2_SMALL_WEIGHTS", "weights/sam2.1_hiera_small.pt")

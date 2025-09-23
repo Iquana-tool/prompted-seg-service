@@ -6,15 +6,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from hydra.core.global_hydra import GlobalHydra
 from hydra import initialize_config_dir
-from models.model_cache import ModelCache
-from models.model_registry import ModelRegistry
 from models.register_models import register_models
 from contextlib import asynccontextmanager
+
+from app.state import MODEL_CACHE, MODEL_REGISTRY
+from app.routes.segment_2D import router as segment_2d_router
+from app.routes import router as general_router
+from app.routes.models import api_router as models_router
+
+
 logger = getLogger(__name__)
 logger.setLevel(DEBUG)
-
-MODEL_CACHE = ModelCache()
-MODEL_REGISTRY = ModelRegistry()
 
 
 @asynccontextmanager
@@ -53,6 +55,8 @@ def create_app():
     )
 
     # Include the routers
-
+    app.include_router(general_router)
+    app.include_router(models_router)
+    app.include_router(segment_2d_router)
 
     return app

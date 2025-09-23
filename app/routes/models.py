@@ -1,15 +1,44 @@
-from fastapi import APIRouter
-from models.model_registry import MODEL_REGISTRY
+from fastapi import APIRouter, HTTPException
+from app.state import MODEL_REGISTRY, MODEL_CACHE
+from logging import getLogger
 
 
-api_router = APIRouter("/models", tags=["models"])
+api_router = APIRouter(prefix="/models", tags=["models"])
+logger = getLogger(__name__)
 
 
 @api_router.get("/available")
 async def list_models():
-    available_models = [model_info.to_json() for model_info in MODEL_REGISTRY.values() if model_info.check_paths()]
-    return {"available_models": available_models}
+    """ Lists all available models in the registry. """
+    available_models = MODEL_REGISTRY.list_models(only_return_available=True)
+    return {
+        "success": True,
+        "message": f"Retrieved {len(available_models)} available models.",
+        "available_models": available_models}
 
 
 @api_router.get("/load_model/{model_id}")
 async def load_model(model_id: str):
+    """ Loads a model into the cache if not already loaded. This is a convenience endpoint; models are loaded
+        automatically when needed, but this can be called at the start
+        of an annotation session to preload the model."""
+    if MODEL_CACHE.check_if_loaded(model_id):
+        return {
+            "success": True,
+            "message": f"Model {model_id} is already loaded in cache.",
+            "model_id": model_id
+        }
+    else:
+        try:
+            model = MODEL_REGISTRY.load_model(model_id)
+            MODEL_CACHE.put(model_id, model)
+            return {
+                "success": True,
+                "message": f"Model {model_id} loaded successfully.",
+                "model_id": model_id
+            }
+        except Exception as e:
+            logger.error(e)
+            if type(e) == KeyError:
+                raise HTTPException(status_code=404, detail=f"Model {model_id} is not registered. Please check available models.")
+            raise HTTPException(status_code=500, detail=f"Error loading model: {str(e)}")

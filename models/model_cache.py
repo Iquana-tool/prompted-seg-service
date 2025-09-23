@@ -1,6 +1,6 @@
 import threading
 from collections import OrderedDict
-from models.model_registry import MODEL_REGISTRY
+
 
 class ModelCache:
     def __init__(self, size_limit=3):
@@ -19,9 +19,16 @@ class ModelCache:
                 self.cache[model_identifier] = model
                 return model
             else:
-                model = MODEL_REGISTRY.load_model(model_identifier)
-                if len(self.cache) >= self.size_limit:
-                    self.cache.popitem(last=False)
-                self.cache[model_identifier] = model
-                return model
+                raise KeyError(model_identifier)
 
+    def put(self, model_identifier, model):
+        with self.lock:  # Acquire lock
+            if model_identifier in self.cache:
+                self.cache.pop(model_identifier)
+            elif len(self.cache) >= self.size_limit:
+                self.cache.popitem(last=False)
+            self.cache[model_identifier] = model
+
+    def check_if_loaded(self, model_identifier):
+        with self.lock:  # Acquire lock
+            return model_identifier in self.cache

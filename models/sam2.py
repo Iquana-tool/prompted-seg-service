@@ -2,7 +2,7 @@ import cv2
 import torch.cuda
 
 from models.base_models import Prompted2DBaseModel
-from models.model_registry import ModelInfo
+from models.model_registry import ModelLoader
 from app.schemas.segment_2D import Prompted2DSegmentationRequest
 from models.prompts import Prompts
 from util.image_loading import load_image_from_upload
@@ -10,17 +10,32 @@ import numpy as np
 from sam2.build_sam import build_sam2 as build, build_sam2_video_predictor
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.sam2_video_predictor import SAM2VideoPredictor
-from paths import *
+import os
 
 
-def load_sam2_model(weights: str, config:str, device='auto'):
-    """ Load the SAM2 model based on the provided model information.
-    :param weights: Path to the model weights.
-    :param config: Path to the model config file.
-    :param device: Device to run the model on. 'auto' will use GPU if available, otherwise CPU.
-    :return: An instance of SAM2Prompted model.
-    """
-    return SAM2Prompted(weights=weights, config=config, device=device)
+class SAM2ModelLoader(ModelLoader):
+    def __init__(self, weights: str, config: str, device='auto'):
+        """
+        Initialize the SAM2 model loader.
+        :param weights: Path to the model weights.
+        :param config: Path to the model config file.
+        :param device: Device to run the model on. 'auto' will use GPU if available, otherwise CPU.
+        """
+        super().__init__(SAM2Prompted, weights=weights, config=config, device=device)
+        self.weights = weights
+        self.config = config
+
+    def is_loadable(self) -> bool:
+        """ Check if the model is loadable by verifying the existence of the weights and config files.
+        :return: True if the model is loadable, False otherwise.
+        """
+        weights_exist = os.path.isfile(self.weights)
+        config_exist = os.path.isfile(self.config)
+        if not weights_exist:
+            print(f"Model weights not found at {self.weights}")
+        if not config_exist:
+            print(f"Model config not found at {self.config}")
+        return weights_exist and config_exist
 
 
 class SAM2Prompted(Prompted2DBaseModel):
