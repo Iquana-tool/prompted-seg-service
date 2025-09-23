@@ -53,7 +53,7 @@ class SAM2Prompted(Prompted2DBaseModel):
             mask = load_image_from_upload(request.previous_mask)
             mask = cv2.resize(mask, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
         mask, scores, _ = self.prompt_predictor.predict(**prompts.to_SAM2_input(),
-                                                        multimask_output=False,
-                                                        mask_input=mask,
-                                                        normalize_coords=False)
+                                                        multimask_output=False,  # We only want one mask
+                                                        mask_input=mask,  # The previous mask for refinement
+                                                        normalize_coords=False)  # Because they are already normalized
         return mask, scores
