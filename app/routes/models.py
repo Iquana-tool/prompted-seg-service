@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.util.model_registry import ModelRegistry, ModelInfo
+from models.model_registry import MODEL_REGISTRY
 
 
 api_router = APIRouter("/models", tags=["models"])
