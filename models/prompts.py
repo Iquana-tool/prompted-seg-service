@@ -1,8 +1,9 @@
 # This file contains classes for prompts
 import cv2
 import numpy as np
-from app.schemas.segmentation.segmentations import PromptedSegmentationRequest
 from logging import getLogger
+from app.schemas.segment_2D import Prompted2DSegmentationRequest
+
 
 logger = getLogger(__name__)
 
@@ -18,7 +19,7 @@ class Prompts:
         self.point_labels = []
         self.box_prompts = []
 
-    def from_segmentation_request(self, seg_req: PromptedSegmentationRequest):
+    def from_segmentation_request(self, seg_req: Prompted2DSegmentationRequest):
         """ Initialize the prompts from a segmentation request. This method will extract the prompts from the
             segmentation request and add them to the list of prompts. The segmentation request should contain the
             following attributes:
