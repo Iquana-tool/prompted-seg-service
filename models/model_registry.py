@@ -1,4 +1,19 @@
-import os
+class ModelLoader:
+    def __init__(self, loader_function, **kwargs):
+        """
+        Class to handle loading of models.
+        :param loader_function: Function that loads the model.
+        :param kwargs: Parameters to be passed to the loader function.
+        """
+        self.loader_function = loader_function
+        self.kwargs = kwargs
+
+    def is_loadable(self):
+        # Implement logic to check if the model can be loaded with the given kwargs
+        raise NotImplementedError
+
+    def load_model(self):
+        return self.loader_function(**self.kwargs)
 
 
 class ModelInfo:
@@ -6,30 +21,21 @@ class ModelInfo:
                  identifier_str: str,
                  name: str,
                  description: str,
-                 weights_path: str,
-                 configs_path: str,
                  tags: list[str],
                  supported_prompt_types: list[str] = ["point", "box"],
                  supports_refinement: bool = False):
         """Class to hold information about a segmentation model.
-        Args:
-            identifier_str: str - Unique identifier for the model.
-            name: str - Human-readable name for the model.
-            description: str - Brief description of the model.
-            weights_path: str - Path to the model weights file.
-            configs_path: str - Path to the model configuration file.
-            tags: list[str] - List of tags associated with the model.
-            supported_prompt_types: list[str] - List of supported prompt types (default: ["point", "box"]).
-                Possible values are "point", "box", "circle", "polygon". Can be extended in the future.
-            supports_refinement: bool - Whether the model supports refinement meaning that you can pass a previous mask
-                to be refined with new annotations (default: False).
-
+        :param identifier_str: Identifier string. Must be unique.
+        :param name: Human readable name of the model.
+        :param description: Description of the model.
+        :param tags: List of tags for the model.
+        :param supported_prompt_types: List of supported prompt types. Default is ["point", "box"].
+        :param supports_refinement: Whether the model supports refinement with a previous mask. Default is False.
+        :raises ValueError: If the identifier string is invalid.
         """
         self.identifier_str = identifier_str
         self.name = name
         self.description = description
-        self.weights_path = weights_path
-        self.configs_path = configs_path
         self.tags = tags
         self.supported_prompt_types = supported_prompt_types
         self.supports_refinement = supports_refinement
@@ -47,78 +53,69 @@ class ModelInfo:
             "supports_refinement": self.supports_refinement
         }
 
-    def check_paths(self, raise_error: bool = False) -> bool:
-        """Check if the weights and configs paths exist. Only checks configs path if it is not None meaning that the
-            model requires a config file.
-        Args:
-            raise_error: bool - Whether to raise an error if paths do not exist (default: False).
-        Returns:
-            bool - True if both paths exist, False otherwise.
-        """
-        config_necessary = self.configs_path is not None
-        if not os.path.exists(self.weights_path) and config_necessary and not os.path.exists(self.configs_path):
-            if raise_error:
-                raise FileNotFoundError(
-                    f"Both weights and configs paths do not exist: {self.weights_path}, {self.configs_path}")
-            return False
-        elif not os.path.exists(self.weights_path):
-            if raise_error:
-                raise FileNotFoundError(f"Weights path does not exist: {self.weights_path}")
-            return False
-        elif config_necessary and not os.path.exists(self.configs_path):
-            if raise_error:
-                raise FileNotFoundError(f"Configs path does not exist: {self.configs_path}")
-            return False
-        else:
-            return True
-
 
 class ModelRegistry:
     def __init__(self):
-        self.models = {}
+        """Registry to hold and manage multiple models."""
+        self.model_infos: dict[str, ModelInfo] = {}
+        self.model_loaders: dict[str, ModelLoader] = {}
 
-    def register_model(self, model_info: ModelInfo):
-        if model_info.identifier_str in self.models:
+    def register_model(self,
+                       model_info: ModelInfo,
+                       model_loader: ModelLoader):
+        """Register a new model in the registry.
+        :param model_info: ModelInfo object.
+        :param model_loader: ModelLoader object.
+        :raises ValueError: If the model identifier is already registered.
+        """
+        if model_info.identifier_str in self.model_infos:
             raise ValueError(f"Model with identifier {model_info.identifier_str} is already registered.")
-        self.models[model_info.identifier_str] = model_info
+        if model_info.identifier_str in self.model_loaders:
+            raise ValueError(f"Model loader with identifier {model_info.identifier_str} is already registered.")
+        self.model_infos[model_info.identifier_str] = model_info
+        self.model_loaders[model_info.identifier_str] = model_loader
 
-    def get_model(self, identifier_str: str) -> ModelInfo:
-        if identifier_str not in self.models:
+    def get_model_info(self, identifier_str: str) -> ModelInfo:
+        """Get the model information for the given identifier."""
+        if identifier_str not in self.model_infos:
             raise KeyError(f"Model with identifier {identifier_str} is not registered.")
-        return self.models[identifier_str]
+        return self.model_infos[identifier_str]
 
-    def check_model(self, identifier_str: str) -> bool:
-        model = self.get_model(identifier_str)
-        return model.check_paths()
+    def get_model_loader(self, identifier_str: str) -> ModelLoader:
+        """Get the model loader for the given identifier."""
+        if identifier_str not in self.model_loaders:
+            raise KeyError(f"Model loader with identifier {identifier_str} is not registered.")
+        return self.model_loaders[identifier_str]
 
-    def list_models(self, only_available: bool = True) -> list[ModelInfo]:
-        if only_available:
-            return [model for model in self.models.values() if model.check_paths()]
-        return list(self.models.values())
+    def check_model_is_loadable(self, identifier_str: str) -> bool:
+        """Check if the model with the given identifier is loadable."""
+        model = self.get_model_loader(identifier_str)
+        return model.is_loadable()
+
+    def list_models(self, only_return_available: bool = True) -> list[ModelInfo]:
+        """List all registered models.
+        :param only_return_available: If True, only return models that are loadable. Default is True.
+        :return: List of ModelInfo objects.
+        """
+        if only_return_available:
+            # Only return loadable models
+            return [model_info for model_info, model_loader in zip(self.model_infos.values(), self.model_loaders.values()) if model_loader.is_loadable()]
+        return list(self.model_infos.values())
+
+    def load_model(self, identifier_str: str):
+        """Load the model with the given identifier."""
+        return self.get_model_loader(identifier_str).load_model()
 
 
 MODEL_REGISTRY = ModelRegistry()
-MODEL_REGISTRY.register_model(ModelInfo(
-    identifier_str="sam2_tiny",
-    name="SAM2 Tiny",
-    description="Segment Anything Model 2 - Tiny version",
-    weights_path="./sam2_tiny/sam2_tiny.pth",
-    configs_path="models/sam2_tiny/sam2_tiny.yaml",
-    tags=["Sam2", "Tiny", "Fast", "General Purpose"]
-))
-MODEL_REGISTRY.register_model(ModelInfo(
-    identifier_str="sam2_base",
-    name="SAM2 Base",
-    description="Segment Anything Model 2 - Base version",
-    weights_path="models/sam2_base/sam2_base.pth",
-    configs_path="models/sam2_base/sam2_base.yaml",
-    tags=["Sam2", "Base", "Balanced", "General Purpose"]
-))
-MODEL_REGISTRY.register_model(ModelInfo(
-    identifier_str="sam2_large",
-    name="SAM2 Large",
-    description="Segment Anything Model 2 - Large version",
-    weights_path="models/sam2_large/sam2_large.pth",
-    configs_path="models/sam2_large/sam2_large.yaml",
-    tags=["Sam2", "Large", "Accurate", "General Purpose"]
-))
+MODEL_REGISTRY.register_model(
+    model_info=ModelInfo(
+        identifier_str="sam2_tiny",
+        name="SAM2 Tiny",
+        description="Segment Anything Model 2 - Tiny version",
+        tags=["Sam2", "Tiny", "Fast", "General Purpose"],),
+    model_loader=ModelLoader(
+        loader_function=lambda weights_path, configs_path: f"Loading model with weights from {weights_path} and configs from {configs_path}",  # Placeholder for now
+        weights_path="models/sam2_tiny/sam2_tiny.pth",
+        configs_path="models/sam2_tiny/sam2_tiny.yaml")
+)

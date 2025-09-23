@@ -98,7 +98,7 @@ class Prompted2DSegmentationRequest(BaseModel):
         if not MODEL_REGISTRY.check_model(value):
             raise ValueError(f"Model with identifier {value} is not available.")
         else:
-            model_info = MODEL_REGISTRY.get_model(value)
+            model_info = MODEL_REGISTRY.get_model_info(value)
             given_prompt_types = []
             if values.get('point_prompts'):
                 if 'point' in model_info.supported_prompt_types:
