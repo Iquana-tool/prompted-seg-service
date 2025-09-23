@@ -2,16 +2,40 @@ import os
 
 
 class ModelInfo:
-    def __init__(self, identifier_str: str, name: str, description: str, weights_path: str, configs_path: str,
-                 tags: list[str]):
+    def __init__(self,
+                 identifier_str: str,
+                 name: str,
+                 description: str,
+                 weights_path: str,
+                 configs_path: str,
+                 tags: list[str],
+                 supported_prompt_types: list[str] = ["point", "box"],
+                 supports_refinement: bool = False):
+        """Class to hold information about a segmentation model.
+        Args:
+            identifier_str: str - Unique identifier for the model.
+            name: str - Human-readable name for the model.
+            description: str - Brief description of the model.
+            weights_path: str - Path to the model weights file.
+            configs_path: str - Path to the model configuration file.
+            tags: list[str] - List of tags associated with the model.
+            supported_prompt_types: list[str] - List of supported prompt types (default: ["point", "box"]).
+                Possible values are "point", "box", "circle", "polygon". Can be extended in the future.
+            supports_refinement: bool - Whether the model supports refinement meaning that you can pass a previous mask
+                to be refined with new annotations (default: False).
+
+        """
         self.identifier_str = identifier_str
         self.name = name
         self.description = description
         self.weights_path = weights_path
         self.configs_path = configs_path
         self.tags = tags
+        self.supported_prompt_types = supported_prompt_types
+        self.supports_refinement = supports_refinement
 
     def to_json(self):
+        """Convert the model information to a JSON-serializable dictionary."""
         return {
             "identifier_str": self.identifier_str,
             "name": self.name,
@@ -19,10 +43,20 @@ class ModelInfo:
             "weights_path": self.weights_path,
             "configs_path": self.configs_path,
             "tags": self.tags,
+            "supported_prompt_types": self.supported_prompt_types,
+            "supports_refinement": self.supports_refinement
         }
 
     def check_paths(self, raise_error: bool = False) -> bool:
-        if not os.path.exists(self.weights_path) and not os.path.exists(self.configs_path):
+        """Check if the weights and configs paths exist. Only checks configs path if it is not None meaning that the
+            model requires a config file.
+        Args:
+            raise_error: bool - Whether to raise an error if paths do not exist (default: False).
+        Returns:
+            bool - True if both paths exist, False otherwise.
+        """
+        config_necessary = self.configs_path is not None
+        if not os.path.exists(self.weights_path) and config_necessary and not os.path.exists(self.configs_path):
             if raise_error:
                 raise FileNotFoundError(
                     f"Both weights and configs paths do not exist: {self.weights_path}, {self.configs_path}")
@@ -31,7 +65,7 @@ class ModelInfo:
             if raise_error:
                 raise FileNotFoundError(f"Weights path does not exist: {self.weights_path}")
             return False
-        elif not os.path.exists(self.configs_path):
+        elif config_necessary and not os.path.exists(self.configs_path):
             if raise_error:
                 raise FileNotFoundError(f"Configs path does not exist: {self.configs_path}")
             return False
