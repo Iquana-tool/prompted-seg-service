@@ -1,20 +1,8 @@
-from pydantic import BaseModel, field_validator, Field
-from fastapi import UploadFile
-from app.schemas.prompts import PointPrompt, BoxPrompt, PolygonPrompt, CirclePrompt
+from pydantic import BaseModel, Field
+from app.schemas.prompts import Prompts
 
-
-class Prompted2DSegmentationRequest(BaseModel):
-    """ Model for validating a prompted segmentation request. One request represents one object to be segmented."""
-    image: UploadFile = Field(..., description="The image to be segmented as a file upload.")
-    previous_mask: UploadFile | None = Field(default=None,
-                                            description="An optional previous mask to provide context. Must be a binary "
-                                                        "mask image file. This does not work with every model.")
-    model_identifier: str = Field(description="The model identifier. Must be one of the registered available models.")
-    point_prompts: list[PointPrompt] | None = Field(default=None,
-                                             description="A list of point prompts. Each point prompt must have x, y, and label.")
-    box_prompt: BoxPrompt | None = Field(default=None,
-                                         description="A bounding box prompt. Must have min_x, min_y, max_x, and max_y.")
-    circle_prompt: CirclePrompt | None = Field(default=None,
-                                               description="A circle prompt. Must have center_x, center_y, and radius.")
-    polygon_prompt: PolygonPrompt | None = Field(default=None,
-                                                 description="A polygon prompt. Must have a list of vertices.")
+class Segment2DFormData(BaseModel):
+    """ Model for 2D segmentation form data. """
+    model_identifier: str = Field(..., title="Model identifier", description="Model identifier string. "
+                                                                             "Used to select the model.")
+    prompts: Prompts = Field(..., title="Prompts", description="Prompts for segmentation")

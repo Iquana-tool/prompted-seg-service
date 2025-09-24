@@ -14,6 +14,8 @@ from app.routes.segment_2D import router as segment_2d_router
 from app.routes import router as general_router
 from app.routes.models import api_router as models_router
 
+from paths import HYDRA_CONFIGS_DIR
+
 
 logger = getLogger(__name__)
 logger.setLevel(DEBUG)
@@ -37,6 +39,10 @@ def create_app():
 
     # Get allowed origins from environment variable
     allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
+    # This is a workaround for the extremely frustrating Hydra config bug.
+    GlobalHydra.instance().clear()
+    initialize_config_dir(config_dir=HYDRA_CONFIGS_DIR)
 
     app = FastAPI(
         title="Coral Segmentation API",
