@@ -38,7 +38,7 @@ def create_app():
     load_dotenv()
 
     # Get allowed origins from environment variable
-    allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000").split(",")
 
     # This is a workaround for the extremely frustrating Hydra config bug.
     GlobalHydra.instance().clear()

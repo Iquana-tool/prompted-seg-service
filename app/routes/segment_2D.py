@@ -12,17 +12,17 @@ router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
 logger = getLogger(__name__)
 
 
-@router.post("/open_image")
-async def open_image(user: str, image: UploadFile = File(...)):
+@router.post("/open_image/user_uid={user_uid}")
+async def open_image(user_uid: str, image: UploadFile = File(...)):
     """Endpoint to upload an image and an optional previous mask.
     This is a placeholder endpoint to demonstrate file upload functionality.
     In a real application, you might want to store the image and return an ID or URL.
     """
     image = load_image_from_upload(image)
-    IMAGE_CACHE.set(user, image)
+    IMAGE_CACHE.set(user_uid, image)
     return {
         "success": True,
-        "message": f"Image uploaded successfully for user {user}.",
+        "message": f"Image uploaded successfully for user {user_uid}.",
         "image_shape": image.shape
     }
 
@@ -82,7 +82,7 @@ async def close_image(user_uid: str):
     }
 
 
-@router.post("/segment_image_with_prompts")
+@router.post("/segment_image_with_prompts/model={model_identifier}&user_uid={user_uid}")
 async def segment_image_with_prompts(
         prompts_request: PromptsRequest,
         model_identifier: str,
