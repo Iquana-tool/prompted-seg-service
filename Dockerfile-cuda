@@ -1,16 +1,20 @@
 # Use a lightweight Python base image
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
-
-# Set the working directory
-WORKDIR /app
+FROM nvidia/cuda:13.0.1-cudnn-devel-ubuntu24.04
 
 # Install system dependencies (git + any required libraries)
-RUN apt-get update --allow-unauthenticated && \
-    apt-get install -y --no-install-recommends --allow-unauthenticated \
+# Also python and pip
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     git \
     libgl1 \
     libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    python3 python3-pip python3-venv\
+    curl && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+RUN source /.local/bin/env
 
 # Copy only the files needed for dependency installation
 COPY . .
