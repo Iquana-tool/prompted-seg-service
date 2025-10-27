@@ -50,8 +50,10 @@ class SAM2Prompted(Prompted2DBaseModel):
         :param device: Device to run the model on. 'auto' will use GPU if available, otherwise CPU.
         """
         self.device = device if device != 'auto' else ('cuda' if torch.cuda.is_available() else 'cpu')
+        # Hydra expects just the config filename, not the full path
+        config_name = os.path.basename(config)
         self.model = build(ckpt_path=weights,
-                           config_file=config,
+                           config_file=config_name,
                            device=self.device)
         self.prompt_predictor = SAM2ImagePredictor(self.model)
         self.set_image = None # To track the current image being processed

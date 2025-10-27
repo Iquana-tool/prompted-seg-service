@@ -14,7 +14,11 @@ RUN apt-get update && \
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-RUN source /.local/bin/env
+# Add uv to PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Verify uv is accessible
+RUN uv --version
 
 # Copy only the files needed for dependency installation
 COPY . .
@@ -22,14 +26,13 @@ COPY . .
 # Sync dependencies using uv
 RUN uv sync --no-cache
 
-# Install torch with or without CUDA
-RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --no-cache-dir ; \
+# Install torch with CUDA support
+RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --no-cache-dir
 
 # Clone and install sam2 from GitHub
 RUN git clone https://github.com/facebookresearch/sam2.git && \
     cd sam2 && \
-    SAM2_BUILD_CUDA=0 \
-    uv pip install . --no-cache-dir && \
+    SAM2_BUILD_CUDA=1 uv pip install . --no-cache-dir && \
     cd .. && rm -rf sam2
 
 # Expose the FastAPI port (default: 8000)

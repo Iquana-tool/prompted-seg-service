@@ -1,0 +1,21 @@
+services:
+  coral-prompted-seg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: coral-prompted-seg
+    container_name: coral-prompted-seg
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./weights:/app/weights
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+    environment:
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8000,http://localhost:3000}
+      - PORT=${PORT:-8001}
+      - LOG_DIR=/app/logs
+      - HYDRA_CONFIGS_DIR=/app/configs
+    restart: unless-stopped
+    command: uv run fastapi run main.py --port 8001
+
