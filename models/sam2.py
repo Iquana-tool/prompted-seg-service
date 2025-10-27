@@ -62,7 +62,7 @@ class SAM2Prompted(Prompted2DBaseModel):
     def process_prompted_request(self, image, prompts: Prompts, previous_mask=None):
         # This works because the third condition is only checked if the first two are false meaning
         # we have a set image and it has the same shape as the uploaded image
-        if self.set_image is None and image.shape != self.set_image or np.all(image == self.set_image):
+        if self.set_image is None or image.shape != self.set_image.shape or np.any(image != self.set_image):
             logger.debug("Setting new image for SAM2 model.")
             # Set the image only if it is different from the previous one
             self.set_image = image
