@@ -4,6 +4,7 @@ import numpy as np
 from fastapi import APIRouter, UploadFile, File, Response
 
 from app.schemas.prompts import Prompts as PromptsRequest
+from app.schemas.segment_2D import Segment2DRequest
 from app.state import MODEL_REGISTRY, MODEL_CACHE, IMAGE_CACHE
 from models.prompts import Prompts
 from util.image_loading import load_image_from_upload
@@ -82,38 +83,29 @@ async def close_image(user_uid: str):
     }
 
 
-@router.post("/segment_image_with_prompts/model={model_identifier}&user_uid={user_uid}")
+@router.post("/segment_image_with_prompts")
 async def segment_image_with_prompts(
-        prompts_request: PromptsRequest,
-        model_identifier: str,
-        user_uid: str,
+        request: Segment2DRequest
     ):
     """Segment an image using 2D prompts.
-    :param image: The image to be segmented.
-    :param previous_mask: An optional previous mask to provide context. Must be a binary mask image file. This does not work with every model.
-    :param form_data: Form data containing model identifier and prompts.
+    :param request: Segment2DRequest containing user_uid, model_identifier, prompts and an optional previous mask.
     :return: Segmentation result.
     """
     try:
-        model = MODEL_CACHE.get(model_identifier)
+        model = MODEL_CACHE.get(request.model_identifier)
     except KeyError:
-        logger.info(f"Cache miss for model {model_identifier}. Loading model.")
-        model = MODEL_REGISTRY.load_model(model_identifier)
-        MODEL_CACHE.put(model_identifier, model)
-    if user_uid not in IMAGE_CACHE:
+        logger.info(f"Cache miss for model {request.model_identifier}. Loading model.")
+        model = MODEL_REGISTRY.load_model(request.model_identifier)
+        MODEL_CACHE.put(request.model_identifier, model)
+    if request.user_id not in IMAGE_CACHE:
         return {"success": False, "message": "No image uploaded for this user. Please upload an image first."}
-    image = IMAGE_CACHE.get(user_uid)
-    prompts = Prompts()
-    for point in prompts_request.point_prompts:
-        prompts.add_point_annotation(point.x, point.y, point.label)
-    if prompts_request.box_prompt:
-        box_prompt = prompts_request.box_prompt
-        prompts.add_box_annotation(box_prompt.min_x,
-                                   box_prompt.min_y,
-                                   box_prompt.max_x,
-                                   box_prompt.max_y)
-    # prompts.add_point_annotation(0.5, 0.5, 1) # Example point prompt in the center
-    masks, scores = model.process_prompted_request(image, prompts, None)
+    image = IMAGE_CACHE.get(request.user_id)
+    prompts = request.prompts
+    if request.previous_mask is not None:
+        previous_mask = np.array(request.previous_mask, dtype=np.uint8)
+    else:
+        previous_mask = None
+    masks, scores = model.process_prompted_request(image, prompts, previous_mask)
     mask = masks[0].astype(np.uint8)
     score = scores[0]
     # Convert the mask to raw bytes
