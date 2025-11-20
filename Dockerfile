@@ -27,6 +27,12 @@ RUN git clone https://github.com/facebookresearch/sam2.git && \
     SAM2_BUILD_CUDA=0 uv pip install . --no-cache-dir && \
     cd .. && rm -rf sam2
 
+# Install sam3
+RUN git clone https://github.com/facebookresearch/sam3.git && \
+    cd sam3 && \
+    uv pip install -e ".[train,dev]" && \
+    cd ..
+
 # Expose the FastAPI port (default: 8000)
 EXPOSE 8000
 
