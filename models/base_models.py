@@ -1,4 +1,4 @@
-from models.prompts import Prompts
+from app.schemas.prompts import Prompts
 from abc import ABC, abstractmethod
 
 
