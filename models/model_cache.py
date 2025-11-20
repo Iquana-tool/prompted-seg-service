@@ -1,5 +1,9 @@
 import threading
 from collections import OrderedDict
+from logging import getLogger
+
+
+logger = getLogger(__name__)
 
 
 class ModelCache:
@@ -32,3 +36,15 @@ class ModelCache:
     def check_if_loaded(self, model_identifier):
         with self.lock:  # Acquire lock
             return model_identifier in self.cache
+
+    def set_image(self, model_identifier, image):
+        with self.lock:
+            if not model_identifier in self.cache:
+                logger.error(f"Trying to set an image for {model_identifier} in cache, but model is not loaded.")
+            else:
+                model = self.cache[model_identifier]
+                try:
+                    model.set_image(image)
+                except NotImplementedError:
+                    logger.warning(f"Trying to set an image for {model_identifier} in cache, "
+                                   f"but model does not implement this function. Skipping.")

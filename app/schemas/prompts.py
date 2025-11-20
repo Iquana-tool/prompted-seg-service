@@ -38,6 +38,25 @@ class BoxPrompt(BaseModel):
             raise ValueError("Box coordinates must be between 0 and 1.")
         return value
 
+    @property
+    def width(self):
+        return self.max_x - self.min_x
+
+    @property
+    def height(self):
+        return self.max_y - self.min_y
+
+    def to_xywh(self):
+        return [self.min_x, self.min_y, self.width, self.height]
+
+    def to_cxywh(self):
+        cx = (self.min_x + self.max_x) / 2.0
+        cy = (self.min_y + self.max_y) / 2.0
+        return [cx, cy, self.width, self.height]
+
+    def to_min_max_box(self):
+        return [self.min_x, self.min_y, self.max_x, self.max_y]
+
 
 class PolygonPrompt(BaseModel):
     """ Model for validating a polygon annotation. """
@@ -78,7 +97,14 @@ class Prompts(BaseModel):
                                              description="A list of point prompts. Each point prompt must have x, y, and label.")
     box_prompt: BoxPrompt | None = Field(default=None,
                                          description="A bounding box prompt. Must have min_x, min_y, max_x, and max_y.")
-    circle_prompt: CirclePrompt | None = Field(default=None,
-                                               description="A circle prompt. Must have center_x, center_y, and radius.")
-    polygon_prompt: PolygonPrompt | None = Field(default=None,
-                                                 description="A polygon prompt. Must have a list of vertices.")
+    noun_prompt: str | None = Field(default=None,
+                                    description="A noun prompt. Describes the object to be segmented.")
+
+    @property
+    def point_coords(self) -> list[list[float]]:
+        return [[pt.x, pt.y] for pt in self.point_prompts]
+
+    @property
+    def point_labels(self):
+        return [pt.label for pt in self.point_prompts]
+

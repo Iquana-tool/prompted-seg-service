@@ -2,11 +2,8 @@ from logging import getLogger
 
 import numpy as np
 from fastapi import APIRouter, UploadFile, File, Response
-
-from app.schemas.prompts import Prompts as PromptsRequest
 from app.schemas.segment_2D import Segment2DRequest
 from app.state import MODEL_REGISTRY, MODEL_CACHE, IMAGE_CACHE
-from models.prompts import Prompts
 from util.image_loading import load_image_from_upload
 
 router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
