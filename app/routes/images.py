@@ -1,12 +1,13 @@
 from logging import getLogger
 
-from fastapi import UploadFile, File
+from fastapi import UploadFile, File, APIRouter
 
-from app.routes import session_router
 from app.state import IMAGE_CACHE
 from util.image_loading import load_image_from_upload
 
 logger = getLogger(__name__)
+session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
+router = APIRouter()
 
 
 @session_router.post("/open_image/user_id={user_id}")
