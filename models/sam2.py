@@ -71,6 +71,6 @@ class SAM2Prompted(Prompted2DBaseModel):
                                                         point_coords=prompts.point_coords if prompts.point_coords else None,
                                                         point_labels=prompts.point_labels if prompts.point_labels else None,
                                                         multimask_output=False,  # We only want one mask
-                                                        mask_input=mask,  # The previous mask for refinement
+                                                        mask_input=np.expand_dims(mask, 0).astype(float) if mask is not None else None,  # The previous mask for refinement
                                                         normalize_coords=False)  # Because they are already normalized
         return mask, scores
