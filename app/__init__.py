@@ -1,21 +1,18 @@
-from logging import getLogger
-from logging import DEBUG
-from dotenv import load_dotenv
 import os
+from contextlib import asynccontextmanager
+from logging import DEBUG
+from logging import getLogger
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from hydra.core.global_hydra import GlobalHydra
 from hydra import initialize_config_dir
-from models.register_models import register_models
-from contextlib import asynccontextmanager
+from hydra.core.global_hydra import GlobalHydra
 
+from app.routes import router, session_router
 from app.state import MODEL_CACHE, MODEL_REGISTRY
-from app.routes.segment_2D import router as segment_2d_router
-from app.routes import router as general_router
-from app.routes.models import api_router as models_router
-
+from models.register_models import register_models
 from paths import HYDRA_CONFIGS_DIR
-
 
 logger = getLogger(__name__)
 logger.setLevel(DEBUG)
@@ -61,8 +58,7 @@ def create_app():
     )
 
     # Include the routers
-    app.include_router(general_router)
-    app.include_router(models_router)
-    app.include_router(segment_2d_router)
+    app.include_router(router)
+    app.include_router(session_router)
 
     return app
