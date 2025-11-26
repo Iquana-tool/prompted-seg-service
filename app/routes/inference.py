@@ -1,13 +1,14 @@
 from logging import getLogger
 
 import numpy as np
-from fastapi import Response
+from fastapi import Response, APIRouter
 
-from app.routes import session_router
 from app.schemas.segment_2D import Segment2DRequest
 from app.state import MODEL_REGISTRY, MODEL_CACHE, IMAGE_CACHE
 
 logger = getLogger(__name__)
+session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
+router = APIRouter()
 
 
 @session_router.post("/segment_image_with_prompts")

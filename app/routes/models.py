@@ -1,11 +1,12 @@
 from logging import getLogger
 
-from fastapi import HTTPException
+from fastapi import HTTPException, APIRouter
 
-from app.routes import router, session_router
 from app.state import MODEL_REGISTRY, MODEL_CACHE
 
 logger = getLogger(__name__)
+session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
+router = APIRouter()
 
 
 @router.get("/get_available_models")

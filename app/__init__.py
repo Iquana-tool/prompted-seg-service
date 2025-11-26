@@ -9,7 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from hydra import initialize_config_dir
 from hydra.core.global_hydra import GlobalHydra
 
-from app.routes import router, session_router
+from app.routes import router as health_router
+from app.routes.images import router as image_router
+from app.routes.images import session_router as image_session_router
+from app.routes.inference import router as inference_router
+from app.routes.inference import session_router as inference_session_router
+from app.routes.models import router as model_router
+from app.routes.models import session_router as model_session_router
 from app.state import MODEL_CACHE, MODEL_REGISTRY
 from models.register_models import register_models
 from paths import HYDRA_CONFIGS_DIR
@@ -58,7 +64,12 @@ def create_app():
     )
 
     # Include the routers
-    app.include_router(router)
-    app.include_router(session_router)
+    app.include_router(health_router)
+    app.include_router(image_router)
+    app.include_router(image_session_router)
+    app.include_router(inference_router)
+    app.include_router(inference_session_router)
+    app.include_router(model_router)
+    app.include_router(model_session_router)
 
     return app
