@@ -27,7 +27,7 @@ def register_models(model_registry: ModelRegistry):
     )
     model_registry.register_model(
         model_info=ModelInfo(
-            identifier_str="sam2.1_baseplus",
+            identifier_str="sam2.1_base_plus",
             name="SAM2.1 Base+",
             description="Segment Anything Model 2.1 - Base+ version. A larger model with better accuracy.",
             tags=["Sam2", "Accurate", "Medium", "General Purpose"], ),
