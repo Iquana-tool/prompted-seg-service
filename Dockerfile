@@ -19,13 +19,12 @@ COPY . .
 RUN uv sync --no-cache
 
 # Install torch with or without CUDA
-RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --no-cache-dir ; \
+RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
 
 # Clone and install sam2 from GitHub
 RUN git clone https://github.com/facebookresearch/sam2.git && \
     cd sam2 && \
-    SAM2_BUILD_CUDA=0 \
-    uv pip install . --no-cache-dir && \
+    SAM2_BUILD_CUDA=0 uv pip install . --no-cache-dir && \
     cd .. && rm -rf sam2
 
 # Install sam3
