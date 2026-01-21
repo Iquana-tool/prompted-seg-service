@@ -10,6 +10,7 @@ from sam2.build_sam import build_sam2 as build, build_sam2_video_predictor
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.sam2_video_predictor import SAM2VideoPredictor
 import os
+from paths import HYDRA_CONFIGS_DIR
 
 
 logger = getLogger(__name__)
@@ -20,7 +21,7 @@ class SAM2ModelLoader(ModelLoader):
         """
         Initialize the SAM2 model loader.
         :param weights: Path to the model weights.
-        :param config: Path to the model config file.
+        :param config: Config name (without .yaml extension) for Hydra to load.
         :param device: Device to run the model on. 'auto' will use GPU if available, otherwise CPU.
         """
         super().__init__(SAM2Prompted, weights=weights, config=config, device=device)
@@ -32,11 +33,13 @@ class SAM2ModelLoader(ModelLoader):
         :return: True if the model is loadable, False otherwise.
         """
         weights_exist = os.path.isfile(self.weights)
-        config_exist = os.path.isfile(self.config)
+        # For Hydra configs, we need to check the actual file path with .yaml extension
+        config_path = os.path.join(HYDRA_CONFIGS_DIR, f"{self.config}.yaml")
+        config_exist = os.path.isfile(config_path)
         if not weights_exist:
             print(f"Model weights not found at {self.weights}")
         if not config_exist:
-            print(f"Model config not found at {self.config}")
+            print(f"Model config not found at {config_path}")
         return weights_exist and config_exist
 
 
