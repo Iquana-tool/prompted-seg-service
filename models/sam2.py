@@ -1,17 +1,16 @@
-import cv2
-import torch.cuda
+import os
 from logging import getLogger
+
+import cv2
+import numpy as np
+import torch.cuda
+from sam2.build_sam import build_sam2 as build
+from sam2.sam2_image_predictor import SAM2ImagePredictor
+from schemas.prompted_segmentation.prompts import Prompts
+
 from models.base_models import Prompted2DBaseModel
 from models.model_registry import ModelLoader
-from app.schemas.prompts import Prompts
-from util.image_loading import load_image_from_upload
-import numpy as np
-from sam2.build_sam import build_sam2 as build, build_sam2_video_predictor
-from sam2.sam2_image_predictor import SAM2ImagePredictor
-from sam2.sam2_video_predictor import SAM2VideoPredictor
-import os
 from paths import HYDRA_CONFIGS_DIR
-
 
 logger = getLogger(__name__)
 
@@ -70,10 +69,10 @@ class SAM2Prompted(Prompted2DBaseModel):
         if previous_mask is not None:
             # resize it to 256x256
             mask = cv2.resize(previous_mask, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
-        mask, scores, _ = self.prompt_predictor.predict(box=prompts.box_prompt.to_min_max_box() if prompts.box_prompt else None,
+        masks, scores, _ = self.prompt_predictor.predict(box=prompts.box_prompt.to_min_max_box() if prompts.box_prompt else None,
                                                         point_coords=prompts.point_coords if prompts.point_coords else None,
                                                         point_labels=prompts.point_labels if prompts.point_labels else None,
                                                         multimask_output=False,  # We only want one mask
                                                         mask_input=np.expand_dims(mask, 0).astype(float) if mask is not None else None,  # The previous mask for refinement
                                                         normalize_coords=False)  # Because they are already normalized
-        return mask, scores
+        return masks, scores
