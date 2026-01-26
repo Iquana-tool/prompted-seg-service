@@ -207,3 +207,7 @@ marimo/_lsp/
 __marimo__/
 /configs/
 /weights/
+
+# SSH keys (for Docker build)
+build_key
+build_key*
