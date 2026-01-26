@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update --allow-unauthenticated && \
     apt-get install -y --no-install-recommends --allow-unauthenticated \
     git \
+    openssh-client \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -15,8 +16,8 @@ RUN apt-get update --allow-unauthenticated && \
 # Copy only the files needed for dependency installation
 COPY . .
 
-# Sync dependencies using uv
-RUN uv sync --no-cache
+# Sync dependencies using uv with SSH mount for private repos
+RUN --mount=type=ssh uv sync --no-cache
 
 # Install torch with or without CUDA
 RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
