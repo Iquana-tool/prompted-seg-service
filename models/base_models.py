@@ -1,4 +1,4 @@
-from schemas.prompted_segmentation.prompts import Prompts
+from schemas.prompts import Prompts
 from abc import ABC, abstractmethod
 
 
