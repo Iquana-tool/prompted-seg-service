@@ -1,57 +1,48 @@
-# Use a lightweight Python base image
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# 1. Choose the base image via ARG
+# Default to CUDA
+ARG BASE_IMAGE=nvidia/cuda:12.8.0-runtime-ubuntu22.04
+FROM $BASE_IMAGE AS base
 
-# Set the working directory
+# --- Stage 1: Builder ---
+FROM base AS builder
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Install Python & build tools IF we are on an NVIDIA (Ubuntu) image
+# (The python-slim image already has these, but nvidia-base doesn't)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-venv python3-pip build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG UV_EXTRA=cuda
 WORKDIR /app
 
-# Install system dependencies (git + any required libraries)
-RUN apt-get update --allow-unauthenticated && \
-    apt-get install -y --no-install-recommends --allow-unauthenticated \
-    git \
-    openssh-client \
+# Sync dependencies
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project --extra $UV_EXTRA
+
+# --- Stage 2: Final Runtime ---
+FROM base AS runtime
+
+# Set up environment
+WORKDIR /app
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+
+# Install runtime system dependencies (GL, etc.)
+# We also ensure Python is present for the NVIDIA base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only the files needed for dependency installation
+# Copy the venv from builder
+COPY --from=builder /app/.venv /app/.venv
 COPY . .
 
-# Setup SSH for private repo access
-RUN mkdir -p ~/.ssh && \
-    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
-    chmod 700 ~/.ssh && \
-    chmod 644 ~/.ssh/known_hosts
-
-# Copy SSH key if it exists (for build-time git access)
-COPY build_key /tmp/build_key
-RUN cp /tmp/build_key ~/.ssh/id_rsa && \
-    chmod 600 ~/.ssh/id_rsa
-
-# Sync dependencies using uv
-RUN uv sync --no-cache
-
-# Remove SSH key after installation
-RUN rm -f ~/.ssh/id_rsa /tmp/build_key
-
-# Install torch with or without CUDA
-RUN uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
-
-# Clone and install sam2 from GitHub
-RUN git clone https://github.com/facebookresearch/sam2.git && \
-    cd sam2 && \
-    SAM2_BUILD_CUDA=0 uv pip install . --no-cache-dir && \
-    cd .. && rm -rf sam2
-
-# Install sam3
-RUN git clone https://github.com/facebookresearch/sam3.git && \
-    cd sam3 && \
-    uv pip install -e ".[train,dev]" && \
-    cd ..
-
-# Expose the FastAPI port (default: 8000)
 EXPOSE 8000
 
-RUN uv pip freeze
-
-# Run the FastAPI app using uvicorn
-CMD ["uv", "run", "fastapi", "run", "main.py", "--port", "8000"]
+CMD ["fastapi", "run", "main.py", "--host", "localhost", "--port", "8000"]
