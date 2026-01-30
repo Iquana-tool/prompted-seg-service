@@ -1,11 +1,9 @@
 from logging import getLogger
 
-import numpy as np
-from fastapi import Response, APIRouter
-from schemas.contours import Contour
-from schemas.masks import BinaryMask
+from fastapi import APIRouter
+from iquana_toolbox.schemas.contours import Contour
+from iquana_toolbox.schemas.service_requests import PromptedSegmentationRequest
 
-from schemas.service_requests import PromptedSegmentationRequest
 from app.state import MODEL_REGISTRY, MODEL_CACHE, IMAGE_CACHE
 
 logger = getLogger(__name__)

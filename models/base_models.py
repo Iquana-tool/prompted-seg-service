@@ -1,4 +1,4 @@
-from schemas.prompts import Prompts
+from iquana_toolbox.schemas.prompts import Prompts
 from abc import ABC, abstractmethod
 
 

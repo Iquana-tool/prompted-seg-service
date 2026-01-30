@@ -1,5 +1,5 @@
 from models.model_registry import ModelRegistry
-from schemas.models import PromptedSegmentationModels
+from iquana_toolbox.schemas.models import PromptedSegmentationModels
 from models.sam2 import SAM2ModelLoader
 from paths import *
 

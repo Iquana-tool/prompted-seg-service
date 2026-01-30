@@ -1,5 +1,5 @@
 from logging import getLogger
-from schemas.models import PromptedSegmentationModels as ModelInfo
+from iquana_toolbox.schemas.models import PromptedSegmentationModels as ModelInfo
 
 logger = getLogger(__name__)
 

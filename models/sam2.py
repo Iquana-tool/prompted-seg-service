@@ -6,7 +6,7 @@ import numpy as np
 import torch.cuda
 from sam2.build_sam import build_sam2 as build
 from sam2.sam2_image_predictor import SAM2ImagePredictor
-from schemas.prompts import Prompts
+from iquana_toolbox.schemas.prompts import Prompts
 
 from models.base_models import Prompted2DBaseModel
 from models.model_registry import ModelLoader

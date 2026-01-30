@@ -6,7 +6,7 @@ from transformers import Sam3Processor, Sam3Model
 from logging import getLogger
 from models.base_models import Prompted2DBaseModel
 from models.model_registry import ModelLoader
-from app.schemas.prompts import Prompts
+from iquana_toolbox.schemas.prompts import Prompts
 
 
 logger = getLogger(__name__)
