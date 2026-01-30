@@ -11,7 +11,7 @@ session_router = APIRouter(prefix="/annotation_session", tags=["annotation_sessi
 router = APIRouter()
 
 
-@session_router.post("/prompted_segmentation")
+@session_router.post("/run")
 async def segment_image_with_prompts(
         request: PromptedSegmentationRequest
     ):
