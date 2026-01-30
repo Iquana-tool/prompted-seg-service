@@ -12,16 +12,25 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 # Install Python & build tools IF we are on an NVIDIA (Ubuntu) image
 # (The python-slim image already has these, but nvidia-base doesn't)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-venv python3-pip build-essential && \
-    rm -rf /var/lib/apt/lists/*
+    python3-venv python3-pip build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-ARG UV_EXTRA=cuda
 WORKDIR /app
+
+# Configure git to use token for private repo access
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+    cd /tmp && \
+    echo "https://${GITHUB_TOKEN}@github.com" > /root/.git-credentials && \
+    GIT_CONFIG_GLOBAL=/root/.gitconfig git config --global credential.helper store && \
+    GIT_CONFIG_GLOBAL=/root/.gitconfig git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
 
 # Sync dependencies
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project --extra $UV_EXTRA
+    uv sync --frozen --no-dev --no-install-project
 
 # --- Stage 2: Final Runtime ---
 FROM base AS runtime
