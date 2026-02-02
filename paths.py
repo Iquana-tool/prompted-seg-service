@@ -8,6 +8,7 @@ HUGGINGFACE_TOKEN = getenv("HUGGINGFACE_TOKEN")
 LOG_DIR = getenv("LOG_DIR", "logs")
 TEMP_DIR = getenv("TEMP_DIR", "temp")
 TEMP_IMAGE_DIR = getenv("TEMP_IMAGE_DIR", "./temp/images")
+REDIS_URL = os.environ.get("REDIS_URL", "localhost:6739")
 
 # Weights and configs paths
 SAM2_TINY_WEIGHTS = getenv("SAM2_TINY_WEIGHTS", "./weights/sam2.1_hiera_tiny.pt")
