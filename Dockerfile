@@ -67,4 +67,4 @@ COPY . .
 
 EXPOSE 8001
 
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uv", "run", "--upgrade", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
