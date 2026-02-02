@@ -35,6 +35,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # --- Stage 2: Final Runtime ---
 FROM base AS runtime
 
+# Copy uv from builder
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 # Set up environment
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH"
@@ -44,14 +47,24 @@ ENV PYTHONUNBUFFERED=1
 # We also ensure Python is present for the NVIDIA base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
+    git \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure git to use token for private repo access in runtime
+ARG GITHUB_TOKEN
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+    cd /tmp && \
+    echo "https://${GITHUB_TOKEN}@github.com" > /root/.git-credentials && \
+    GIT_CONFIG_GLOBAL=/root/.gitconfig git config --global credential.helper store && \
+    GIT_CONFIG_GLOBAL=/root/.gitconfig git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
 
 # Copy the venv from builder
 COPY --from=builder /app/.venv /app/.venv
 COPY . .
 
-EXPOSE 8000
+EXPOSE 8001
 
-CMD ["fastapi", "run", "main.py", "--host", "localhost", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
