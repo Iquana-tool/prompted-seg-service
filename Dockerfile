@@ -7,7 +7,10 @@ FROM $BASE_IMAGE AS base
 FROM base AS builder
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uvx /bin/uvx
 
 # Install Python & build tools IF we are on an NVIDIA (Ubuntu) image
 # (The python-slim image already has these, but nvidia-base doesn't)
@@ -36,7 +39,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM base AS runtime
 
 # Copy uv from builder
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uvx /bin/uvx
 
 # Set up environment
 WORKDIR /app
