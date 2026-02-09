@@ -24,11 +24,15 @@ async def segment_image_with_prompts(
     except KeyError:
         logger.info(f"Cache miss for user {request.user_id}. Loading model.")
         model = MODEL_REGISTRY.load_model(request.model_registry_key)
-        MODEL_CACHE.put(request.user_id, model)
+        MODEL_CACHE.put(request.user_id, request.model_registry_key, model)
     if request.user_id not in IMAGE_CACHE:
         IMAGE_CACHE.set(request.user_id, request.image)
     image = IMAGE_CACHE.get(request.user_id)
-    masks, scores = model.process_prompted_request(image, request.prompts, request.previous_mask)
+    masks, scores = model.process_prompted_request(
+        image,
+        request.prompts,
+        request.previous_mask.mask if request.previous_mask else None,
+    )
     return {
         "success": True,
         "message": "Successfully performed prompted segmentation.",
