@@ -6,8 +6,6 @@ from logging import getLogger
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from hydra import initialize_config_dir
-from hydra.core.global_hydra import GlobalHydra
 
 from app.routes import router as health_router
 from app.routes.images import router as image_router
@@ -18,7 +16,6 @@ from app.routes.models import router as model_router
 from app.routes.models import session_router as model_session_router
 from app.state import MODEL_CACHE, MODEL_REGISTRY
 from models.register_models import register_models
-from paths import HYDRA_CONFIGS_DIR
 
 logger = getLogger(__name__)
 logger.setLevel(DEBUG)
@@ -42,10 +39,6 @@ def create_app():
 
     # Get allowed origins from environment variable
     allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000").split(",")
-
-    # This is a workaround for the extremely frustrating Hydra config bug.
-    GlobalHydra.instance().clear()
-    initialize_config_dir(config_dir=HYDRA_CONFIGS_DIR)
 
     app = FastAPI(
         title="Coral Segmentation API",

@@ -1,6 +1,6 @@
 from models.model_registry import ModelRegistry
 from iquana_toolbox.schemas.models import PromptedSegmentationModels
-from models.sam2 import SAM2ModelLoader
+from models.sam2 import SAMModelLoader
 from paths import *
 
 
@@ -19,9 +19,7 @@ def register_models(model_registry: ModelRegistry):
             prompt_types_supported=["point", "box"],
             refinement_supported=True,
         ),
-        model_loader=SAM2ModelLoader(
-            weights=SAM2_TINY_WEIGHTS,
-            config=SAM2_TINY_CONFIG)
+        model_loader=SAMModelLoader(model_name_or_path="facebook/sam2.1-hiera-tiny")
     )
     model_registry.register_model(
         model_info=PromptedSegmentationModels(
@@ -36,9 +34,7 @@ def register_models(model_registry: ModelRegistry):
             prompt_types_supported=["point", "box"],
             refinement_supported=True,
          ),
-        model_loader=SAM2ModelLoader(
-            weights=SAM2_SMALL_WEIGHTS,
-            config=SAM2_SMALL_CONFIG)
+        model_loader=SAMModelLoader(model_name_or_path="facebook/sam2.1-hiera-small")
     )
     model_registry.register_model(
         model_info=PromptedSegmentationModels(
@@ -53,9 +49,7 @@ def register_models(model_registry: ModelRegistry):
             prompt_types_supported=["point", "box"],
             refinement_supported=True,
          ),
-        model_loader=SAM2ModelLoader(
-            weights=SAM2_BASE_WEIGHTS,
-            config=SAM2_BASE_CONFIG)
+        model_loader=SAMModelLoader(model_name_or_path="facebook/sam2.1-hiera-base-plus")
     )
     model_registry.register_model(
         model_info=PromptedSegmentationModels(
@@ -70,7 +64,5 @@ def register_models(model_registry: ModelRegistry):
             prompt_types_supported=["point", "box"],
             refinement_supported=True,
         ),
-        model_loader=SAM2ModelLoader(
-            weights=SAM2_LARGE_WEIGHTS,
-            config=SAM2_LARGE_CONFIG)
+        model_loader=SAMModelLoader(model_name_or_path="facebook/sam2.1-hiera-large")
     )
