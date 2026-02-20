@@ -100,8 +100,9 @@ class SAMPrompted(Prompted2DBaseModel):
         )
 
         # scores: [batch_size, num_masks]
-        scores = outputs.iou_scores.cpu().numpy()
+        scores = outputs.iou_scores.cpu().numpy()[0]
+        best_index = scores.argmax() # take the mask with the best score
 
         # masks[0] is [1, 3, H, W] -> taking the first batch and usually the highest score mask
-        final_mask = masks[0][0].numpy().astype(np.uint8) * 255
-        return final_mask, scores[0][0]
+        final_mask = masks[0][best_index].numpy().astype(np.uint8) * 255
+        return final_mask, scores[best_index]
