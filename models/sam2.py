@@ -89,20 +89,22 @@ class SAMPrompted(Prompted2DBaseModel):
         with torch.no_grad():
             outputs = self.model(
                 **inputs,
-                input_masks=_previous_mask
+                input_masks=_previous_mask,
+                multimask_output=True,
             )
 
         # 4. Post-processing
         # Convert outputs (low-res masks) to original image size
-        masks = self.processor.post_process_masks(
+        batches = self.processor.post_process_masks(
             outputs.pred_masks.cpu(),
             inputs["original_sizes"].cpu()
         )
 
-        # scores: [batch_size, num_masks]
-        scores = outputs.iou_scores.cpu().numpy()[0]
-        best_index = scores.argmax() # take the mask with the best score
+        # scores: [batch_size, 1, num_masks]
+        scores = outputs.iou_scores.cpu().numpy().squeeze()
+        best_index = np.argmax(scores) # take the mask with the best score
 
         # masks[0] is [1, 3, H, W] -> taking the first batch and usually the highest score mask
-        final_mask = masks[0][best_index].numpy().astype(np.uint8) * 255
-        return final_mask, scores[best_index]
+        masks = batches[0].squeeze()
+        final_mask = masks[best_index].numpy().astype(np.uint8) * 255
+        return [final_mask], [scores[best_index]]
