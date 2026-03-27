@@ -5,28 +5,10 @@ import torch
 from transformers import Sam3Processor, Sam3Model
 from logging import getLogger
 from models.base_models import Prompted2DBaseModel
-from models.model_registry import ModelLoader
 from iquana_toolbox.schemas.prompts import Prompts
 
 
 logger = getLogger(__name__)
-
-
-class SAM3ModelLoader(ModelLoader):
-    def __init__(self, weights: str, config: str, device: str):
-        """
-        Initialize the SAM3 model loader.
-        :param weights: Path to the model weights.
-        :param config: Path to the model config file.
-        :param device: Device to run the model on. 'auto' will use GPU if available, otherwise CPU.
-        """
-        super().__init__(weights)
-        self.weights = weights
-        self.config = config
-        self.device = device
-
-    def is_loadable(self):
-        return True
 
 
 class SAM3Prompted(Prompted2DBaseModel):
@@ -39,7 +21,7 @@ class SAM3Prompted(Prompted2DBaseModel):
         """
         self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
         self.checkpoint_path = checkpoint_path
-        self.model: Sam3Model = Sam3Model.from_pretrained("facebook/sam3").to(self.device)
+        self.model = Sam3Model.from_pretrained("facebook/sam3").to(self.device)
         self.processor: Sam3Processor = Sam3Processor.from_pretrained("facebook/sam3")
         self.set_image = None
         self.inference_state = None

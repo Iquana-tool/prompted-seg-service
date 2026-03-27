@@ -8,29 +8,8 @@ from iquana_toolbox.schemas.prompts import Prompts
 from transformers import Sam2Model, Sam2Processor
 from paths import HUGGINGFACE_TOKEN
 from models.base_models import Prompted2DBaseModel
-from models.model_registry import ModelLoader
 
 logger = getLogger(__name__)
-
-
-class SAMModelLoader(ModelLoader):
-    def __init__(self, model_name_or_path: str, device='auto'):
-        """
-        Initialize the SAM model loader using Transformers.
-        :param model_name_or_path: Path to the model weights or HF model ID (e.g., 'facebook/sam-vit-huge').
-        :param device: Device to run the model on.
-        """
-        super().__init__(SAMPrompted, model_name_or_path=model_name_or_path, device=device)
-        self.model_name_or_path = model_name_or_path
-
-    def is_loadable(self) -> bool:
-        """ Check if the model is loadable. """
-        # If it's a local path, check if exists; if it's a HF ID, we assume it's valid for this context.
-        if os.path.isdir(self.model_name_or_path) or os.path.isfile(self.model_name_or_path):
-            return True
-        # For HF hub models, you might want to add a check using huggingface_hub,
-        # but returning True is standard for lazy loading.
-        return True
 
 
 class SAMPrompted(Prompted2DBaseModel):
@@ -38,6 +17,7 @@ class SAMPrompted(Prompted2DBaseModel):
         """
         Initialize the prompted SAM model using Transformers.
         """
+        super().__init__()
         self.device = device if device != 'auto' else ('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Load processor and model from transformers

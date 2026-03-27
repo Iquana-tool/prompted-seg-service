@@ -1,8 +1,9 @@
+import torch
 from iquana_toolbox.schemas.prompts import Prompts
 from abc import ABC, abstractmethod
 
 
-class Prompted2DBaseModel(ABC):
+class Prompted2DBaseModel(torch.nn.Module, ABC):
     """ Abstract base class for 2D prompted segmentation models. """
     @abstractmethod
     def process_prompted_request(self, image, prompts: Prompts, previous_mask=None):

@@ -2,7 +2,7 @@ from logging import getLogger
 
 from fastapi import HTTPException, APIRouter
 
-from app.state import MODEL_REGISTRY, MODEL_CACHE
+from app.state import MODEL_REGISTRY
 
 logger = getLogger(__name__)
 session_router = APIRouter(prefix="/annotation_session", tags=["annotation_session"])
@@ -12,7 +12,9 @@ router = APIRouter()
 @router.get("/models/all")
 async def list_models():
     """ Lists all available models in the registry. """
-    available_models = MODEL_REGISTRY.list_models()
+    available_models = MODEL_REGISTRY.get_models_via_tags(tags={
+        "task": "prompted_segmentation",
+    })
     return {
         "success": True,
         "message": f"Retrieved {len(available_models)} available models.",
@@ -22,7 +24,10 @@ async def list_models():
 @router.get("/models/all/available")
 async def list_models():
     """ Lists all available models in the registry. """
-    available_models = MODEL_REGISTRY.list_models(only_return_available=True)
+    available_models = MODEL_REGISTRY.get_models_via_tags(tags={
+        "task": "prompted_segmentation",
+        "status": "ready"
+    })
     return {
         "success": True,
         "message": f"Retrieved {len(available_models)} available models.",
