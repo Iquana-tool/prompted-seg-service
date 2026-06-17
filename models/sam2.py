@@ -95,6 +95,7 @@ class SAMPrompted(PromptedSegmentationModel):
             registry_key=registry_key,
             name=cfg["name"],
             description=cfg["description"],
+            usage_tip="Provide point and/or box prompts; supports iterative refinement using the previous mask.",
             tags={
                 "task": "prompted-segmentation",
                 "status": "ready",
