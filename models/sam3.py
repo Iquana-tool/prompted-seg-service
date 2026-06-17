@@ -4,14 +4,14 @@ import numpy as np
 import torch
 from transformers import Sam3Processor, Sam3Model
 from logging import getLogger
-from models.base_models import Prompted2DBaseModel
+from models.base_models import PromptedBaseModel
 from iquana_toolbox.schemas.prompts import Prompts
 
 
 logger = getLogger(__name__)
 
 
-class SAM3Prompted(Prompted2DBaseModel):
+class SAM3Prompted(PromptedBaseModel):
     def __init__(self, checkpoint_path: str, device: Literal["cpu", "cuda", "auto"] = "auto"):
         """
         Initialize the prompted SAM3 model.
