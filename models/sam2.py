@@ -1,6 +1,7 @@
 from logging import getLogger
 from typing import Any
 
+import cv2
 import numpy as np
 import torch
 from torchvision.transforms.functional import resize
@@ -18,6 +19,12 @@ from iquana_service_core import register_model
 from paths import HUGGINGFACE_TOKEN
 
 logger = getLogger(__name__)
+
+# Foreground/background logit magnitude for the dense mask prompt. SAM2's prompt
+# encoder feeds the mask straight through conv layers (no thresholding/scaling),
+# so a raw {0, 1} mask is a far weaker hint than the low-res *logits* it expects.
+# We map background -> -L and foreground -> +L to approximate that signal.
+_MASK_PROMPT_LOGIT = 50.0
 
 
 # One entry per registered SAM 2.1 variant. The model is fully self-describing:
@@ -95,7 +102,8 @@ class SAMPrompted(PromptedSegmentationModel):
             registry_key=registry_key,
             name=cfg["name"],
             description=cfg["description"],
-            usage_tip="Provide point and/or box prompts; supports iterative refinement using the previous mask.",
+            usage_tip="Provide point, box and/or polygon prompts; supports iterative refinement using the "
+                      "previous mask. Polygons are fed to SAM2 as a dense mask prompt.",
             tags={
                 "task": "prompted-segmentation",
                 "status": "ready",
@@ -108,7 +116,7 @@ class SAMPrompted(PromptedSegmentationModel):
             },
             status="ready",
             trainable=False,
-            prompt_types_supported=["point", "box"],
+            prompt_types_supported=["point", "box", "polygon"],
             refinement_supported=True,
         )
 
@@ -129,14 +137,16 @@ class SAMPrompted(PromptedSegmentationModel):
         for request in requests:
             previous_mask = request.previous_mask.mask if request.previous_mask else None
             mask, score = self._segment(request.image, request.prompts, previous_mask)
-            contours.append(
-                Contour.from_binary_mask(
-                    binary_mask=mask,
-                    only_return_biggest_contour=True,  # one prompted object per request
-                    confidence=score,
-                    added_by=request.model_registry_key,
-                )
+            contour = Contour.from_binary_mask(
+                binary_mask=mask,
+                only_return_biggest_contour=True,  # one prompted object per request
+                confidence=score,
+                added_by=request.model_registry_key,
             )
+            # An empty SAM2 mask yields no contour; skip it so it doesn't poison the
+            # candidate list the backend validates downstream.
+            if contour is not None:
+                contours.append(contour)
         return contours
 
     def train(self, request, **kwargs):
@@ -160,6 +170,20 @@ class SAMPrompted(PromptedSegmentationModel):
             ymax = int(ymax * image.shape[0])
             box_coords = [[[xmin, ymin, xmax, ymax]]]
 
+        # A polygon/freehand prompt on its own is SAM2's weakest mode (dense mask
+        # only), which often yields messy or empty masks. When no explicit box was
+        # given, derive the polygon's bounding box as a reliable localisation prompt;
+        # the polygon shape is still applied as the dense mask prompt below.
+        if prompts.polygon_prompt and box_coords is None:
+            xs = [v[0] for v in prompts.polygon_prompt.vertices]
+            ys = [v[1] for v in prompts.polygon_prompt.vertices]
+            box_coords = [[[
+                int(min(xs) * image.shape[1]),
+                int(min(ys) * image.shape[0]),
+                int(max(xs) * image.shape[1]),
+                int(max(ys) * image.shape[0]),
+            ]]]
+
         # 2. Pre-process image + prompts (the processor handles resize/normalisation).
         inputs = self.processor(
             [image],
@@ -169,14 +193,28 @@ class SAMPrompted(PromptedSegmentationModel):
             return_tensors="pt",
         ).to(self.device)
 
-        _previous_mask = None
+        # Dense mask prompt. Two sources map onto SAM2's single dense input:
+        #   * refinement -> the previous object mask, and
+        #   * a polygon prompt -> rasterised to a mask (SAM2 has no native polygon
+        #     encoder, so a polygon is fed as the dense mask prompt).
+        # When both are present they are OR-combined.
+        mask_prompt = None  # binary {0, 1} mask
         if previous_mask is not None:
-            _previous_mask = torch.from_numpy(previous_mask).unsqueeze(0).unsqueeze(0).to(self.device).float()
-            _previous_mask = resize(_previous_mask, [256, 256])
+            mask_prompt = previous_mask.astype(np.uint8)
+        if prompts.polygon_prompt:
+            # Match the polygon raster to the prior's grid when combining, else use
+            # the model's 256x256 dense-prompt grid directly.
+            height, width = mask_prompt.shape[:2] if mask_prompt is not None else (256, 256)
+            polygon_mask = self._polygon_to_mask(prompts.polygon_prompt.vertices, height, width)
+            mask_prompt = polygon_mask if mask_prompt is None else (
+                np.logical_or(mask_prompt, polygon_mask).astype(np.uint8)
+            )
+
+        dense_mask = self._mask_to_logit_prompt(mask_prompt) if mask_prompt is not None else None
 
         # 3. Inference.
         with torch.no_grad():
-            outputs = self.model(**inputs, input_masks=_previous_mask, multimask_output=True)
+            outputs = self.model(**inputs, input_masks=dense_mask, multimask_output=True)
 
         # 4. Post-process: upscale to original size and pick the best-scoring mask.
         batches = self.processor.post_process_masks(outputs.pred_masks.cpu(), inputs["original_sizes"].cpu())
@@ -186,6 +224,30 @@ class SAMPrompted(PromptedSegmentationModel):
         masks = batches[0].squeeze()
         final_mask = masks[best_index].numpy().astype(np.uint8) * 255
         return final_mask, float(scores[best_index])
+
+    @staticmethod
+    def _polygon_to_mask(vertices: list[list[float]], height: int, width: int) -> np.ndarray:
+        """Rasterise a polygon (normalised vertices) into a filled binary mask."""
+        points = np.array(
+            [[int(round(x * width)), int(round(y * height))] for x, y in vertices],
+            dtype=np.int32,
+        )
+        mask = np.zeros((height, width), dtype=np.uint8)
+        cv2.fillPoly(mask, [points], color=1)
+        return mask
+
+    def _mask_to_logit_prompt(self, mask: np.ndarray) -> torch.Tensor:
+        """Turn a binary mask into SAM2's 256x256 dense logit mask prompt.
+
+        The processor squashes the image to a square, so the mask prompt is
+        squashed to the matching 256x256 grid (no aspect-ratio padding). Values
+        are mapped from {0, 1} into logit space because the prompt encoder feeds
+        the mask straight through conv layers without thresholding.
+        """
+        mask_t = torch.from_numpy(mask.astype(np.float32)).unsqueeze(0).unsqueeze(0)
+        mask_t = resize(mask_t, [256, 256])  # bilinear; values land in [0, 1]
+        logits = mask_t * (2.0 * _MASK_PROMPT_LOGIT) - _MASK_PROMPT_LOGIT
+        return logits.to(self.device)
 
 
 # --- Registered variants: each a zero-arg factory the catalog auto-discovers. ---

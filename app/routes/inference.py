@@ -20,9 +20,11 @@ async def inference(request: PromptedSegmentationRequest):
     model = MODEL_REGISTRY.get_model_by_alias(request.model_registry_key, "latest")
     # model is an MLflow PyFuncModel; predict(data) forwards to the model's
     # predict(context, model_input=data, params), which returns a list[Contour].
+    # Return all candidates so the backend can pick the best one (e.g. discard a
+    # candidate that just re-segments the focussed parent and keep the next best).
     contours = model.predict([request])
     return {
         "success": True,
-        "message": "Successfully performed prompted segmentation.",
-        "result": contours[0] if contours else None,
+        "message": f"Successfully performed prompted segmentation. Found {len(contours)} candidate(s).",
+        "result": contours,
     }
