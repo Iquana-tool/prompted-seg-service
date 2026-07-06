@@ -97,6 +97,7 @@ class SAMPrompted(PromptedSegmentationModel):
     def __init__(self, registry_key: str, device: str = "auto"):
         cfg = _VARIANTS[registry_key]
         self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.checkpoint = cfg["checkpoint"]
 
         self.model_info = PromptedSegmentationModelInfo(
             registry_key=registry_key,
@@ -120,8 +121,31 @@ class SAMPrompted(PromptedSegmentationModel):
             refinement_supported=True,
         )
 
-        self.processor = Sam2Processor.from_pretrained(cfg["checkpoint"], token=HUGGINGFACE_TOKEN)
-        self.model = Sam2Model.from_pretrained(cfg["checkpoint"], token=HUGGINGFACE_TOKEN).to(self.device)
+        self._load_weights()
+
+    def _load_weights(self) -> None:
+        """(Re)build the HF processor + model from the checkpoint on ``self.device``."""
+        self.processor = Sam2Processor.from_pretrained(self.checkpoint, token=HUGGINGFACE_TOKEN)
+        self.model = Sam2Model.from_pretrained(self.checkpoint, token=HUGGINGFACE_TOKEN).to(self.device)
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Exclude the live HF objects from the MLflow/cloudpickle artifact.
+
+        Pickling ``processor``/``model`` bakes the *installed* transformers'
+        internal module layout into the artifact, so any later transformers
+        upgrade can break the unpickled object (e.g. the ``num_pos_feats`` ->
+        ``num_position_features`` rename in ``Sam2SinePositionEmbedding``). We
+        persist only ``checkpoint``/``device`` and rebuild the weights from the
+        Hub in :meth:`load_context`, matching whatever transformers is loaded.
+        """
+        state = self.__dict__.copy()
+        state.pop("model", None)
+        state.pop("processor", None)
+        return state
+
+    def load_context(self, context: Any) -> None:
+        """Runs once when MLflow loads the model; rebuild the HF objects fresh."""
+        self._load_weights()
 
     def predict(
         self,
