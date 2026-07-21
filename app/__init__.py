@@ -7,6 +7,13 @@ from app.routes.inference import router as inference_router
 
 logger = logging.getLogger(__name__)
 
+    if torch.cuda.is_available():
+        device = f"cuda ({torch.cuda.get_device_name(0)})"
+    elif torch.backends.mps.is_available():
+        device = "mps (Apple Silicon)"
+    else:
+        device = "cpu"
+    return {"device": device, "torch_version": torch.__version__}
 
 def create_app():
     return create_service_app(
