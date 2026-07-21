@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "celery>=5.6.2",
     "fastapi[standard]>=0.116.2",
+    "iquana-service-core",
     "iquana-toolbox",
     "numpy>=2.3.3",
     "opencv-python>=4.11.0.86",
@@ -26,6 +27,12 @@ dev = [
 torch = [
   { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
+torchvision = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+iquana-service-core = { git = "https://github.com/Iquana-tool/iquana-service-core.git" }
+# For local dev before that repo is pushed, swap the line above for a path source:
+# iquana-service-core = { path = "../iquana-service-core" }
 iquana-toolbox = { git = "https://github.com/Iquana-tool/iquana-toolbox.git" }
 
 [[tool.uv.index]]

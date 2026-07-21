@@ -3,6 +3,7 @@ from logging import getLogger
 
 import numpy as np
 import torch
+import torchvision
 from torchvision.transforms.functional import resize
 from iquana_toolbox.schemas.prompts import Prompts
 from transformers import Sam2Model, Sam2Processor
