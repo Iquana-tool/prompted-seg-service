@@ -1,5 +1,5 @@
 [project]
-name = "coral-prompted-seg"
+name = "iquana-prompted-seg"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
@@ -11,8 +11,8 @@ dependencies = [
     "numpy>=2.3.3",
     "opencv-python>=4.11.0.86",
     "torch",
-    "torchvision>=0.26.0",
-    "transformers==5.2.0",
+    "torchvision",
+    "transformers",
 ]
 
 [project.optional-dependencies]
@@ -25,10 +25,10 @@ dev = [
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 torchvision = [
-  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 iquana-service-core = { git = "https://github.com/Iquana-tool/iquana-service-core.git" }
 # For local dev before that repo is pushed, swap the line above for a path source:
@@ -36,7 +36,7 @@ iquana-service-core = { git = "https://github.com/Iquana-tool/iquana-service-cor
 iquana-toolbox = { git = "https://github.com/Iquana-tool/iquana-toolbox.git" }
 
 [[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 

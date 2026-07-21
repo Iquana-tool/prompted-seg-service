@@ -1,42 +1,185 @@
-import os
 from logging import getLogger
+from typing import Any
 
+import cv2
 import numpy as np
 import torch
-import torchvision
 from torchvision.transforms.functional import resize
-from iquana_toolbox.schemas.prompts import Prompts
 from transformers import Sam2Model, Sam2Processor
+
+from iquana_toolbox.ai.base_classes import (
+    PromptedSegmentationModel,
+    PromptedSegmentationModelInfo,
+)
+from iquana_toolbox.schemas.database.contours import Contour
+from iquana_toolbox.schemas.networking.http.services import PromptedSegmentationRequest
+from iquana_toolbox.schemas.prompts import Prompts
+from iquana_service_core import register_model
+
 from paths import HUGGINGFACE_TOKEN
-from models.base_models import Prompted2DBaseModel
 
 logger = getLogger(__name__)
 
+# Foreground/background logit magnitude for the dense mask prompt. SAM2's prompt
+# encoder feeds the mask straight through conv layers (no thresholding/scaling),
+# so a raw {0, 1} mask is a far weaker hint than the low-res *logits* it expects.
+# We map background -> -L and foreground -> +L to approximate that signal.
+_MASK_PROMPT_LOGIT = 50.0
 
-class SAMPrompted(Prompted2DBaseModel):
-    def __init__(self, model_name_or_path, device='auto'):
-        """
-        Initialize the prompted SAM model using Transformers.
-        """
-        super().__init__()
-        self.device = device if device != 'auto' else ('cuda' if torch.cuda.is_available() else 'cpu')
 
-        # Load processor and model from transformers
-        self.processor = Sam2Processor.from_pretrained(
-            model_name_or_path,
-            token=HUGGINGFACE_TOKEN,
+# One entry per registered SAM 2.1 variant. The model is fully self-describing:
+# each instance builds its own model_info from the entry keyed by registry_key.
+_VARIANTS: dict[str, dict] = {
+    "sam2-1-tiny": {
+        "checkpoint": "facebook/sam2.1-hiera-tiny",
+        "name": "SAM 2.1 Tiny",
+        "description": (
+            "Segment Anything Model 2.1 - Tiny variant. The smallest and fastest model "
+            "with lowest memory footprint. Suitable for real-time inference but with "
+            "reduced accuracy. Supports point and box prompts."
+        ),
+        "model_size": "tiny",
+        "inference_speed": "fastest",
+        "accuracy_level": "low",
+        "requires_gpu": "false",
+    },
+    "sam2-1-small": {
+        "checkpoint": "facebook/sam2.1-hiera-small",
+        "name": "SAM 2.1 Small",
+        "description": (
+            "Segment Anything Model 2.1 - Small variant. Provides a good balance between "
+            "inference speed and segmentation accuracy. Ideal for production use cases "
+            "requiring reasonable performance. Supports point and box prompts."
+        ),
+        "model_size": "small",
+        "inference_speed": "fast",
+        "accuracy_level": "medium",
+        "requires_gpu": "true",
+    },
+    "sam2-1-base-plus": {
+        "checkpoint": "facebook/sam2.1-hiera-base-plus",
+        "name": "SAM 2.1 Base+",
+        "description": (
+            "Segment Anything Model 2.1 - Base+ variant. Larger model with improved "
+            "accuracy compared to the small variant. Good choice for accuracy-critical "
+            "applications. Supports point and box prompts with refinement capabilities."
+        ),
+        "model_size": "base-plus",
+        "inference_speed": "medium",
+        "accuracy_level": "high",
+        "requires_gpu": "true",
+    },
+    "sam2-1-large": {
+        "checkpoint": "facebook/sam2.1-hiera-large",
+        "name": "SAM 2.1 Large",
+        "description": (
+            "Segment Anything Model 2.1 - Large variant. The largest and most accurate "
+            "SAM2 model. Best segmentation quality but requires more VRAM and slower "
+            "inference. Recommended for offline and accuracy-critical workflows. Supports "
+            "point and box prompts."
+        ),
+        "model_size": "large",
+        "inference_speed": "slowest",
+        "accuracy_level": "highest",
+        "requires_gpu": "true",
+    },
+}
+
+
+class SAMPrompted(PromptedSegmentationModel):
+    """Prompted segmentation backed by SAM 2.1 (HuggingFace Transformers).
+
+    One class, four registered variants (tiny/small/base-plus/large). The variant
+    is selected by ``registry_key``; the model derives its full ``model_info`` from
+    the matching entry in :data:`_VARIANTS`.
+    """
+
+    def __init__(self, registry_key: str, device: str = "auto"):
+        cfg = _VARIANTS[registry_key]
+        self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.checkpoint = cfg["checkpoint"]
+
+        self.model_info = PromptedSegmentationModelInfo(
+            registry_key=registry_key,
+            name=cfg["name"],
+            description=cfg["description"],
+            usage_tip="Provide point, box and/or polygon prompts; supports iterative refinement using the "
+                      "previous mask. Polygons are fed to SAM2 as a dense mask prompt.",
+            tags={
+                "task": "prompted-segmentation",
+                "status": "ready",
+                "pretrained": "true",
+                "finetunable": "false",
+                "model_size": cfg["model_size"],
+                "inference_speed": cfg["inference_speed"],
+                "accuracy_level": cfg["accuracy_level"],
+                "requires_gpu": cfg["requires_gpu"],
+            },
+            status="ready",
+            trainable=False,
+            prompt_types_supported=["point", "box", "polygon"],
+            refinement_supported=True,
         )
-        self.model = Sam2Model.from_pretrained(
-            model_name_or_path,
-            token=HUGGINGFACE_TOKEN,
-        ).to(self.device)
 
-    def process_prompted_request(self, image, prompts: Prompts, previous_mask=None):
+        self._load_weights()
+
+    def _load_weights(self) -> None:
+        """(Re)build the HF processor + model from the checkpoint on ``self.device``."""
+        self.processor = Sam2Processor.from_pretrained(self.checkpoint, token=HUGGINGFACE_TOKEN)
+        self.model = Sam2Model.from_pretrained(self.checkpoint, token=HUGGINGFACE_TOKEN).to(self.device)
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Exclude the live HF objects from the MLflow/cloudpickle artifact.
+
+        Pickling ``processor``/``model`` bakes the *installed* transformers'
+        internal module layout into the artifact, so any later transformers
+        upgrade can break the unpickled object (e.g. the ``num_pos_feats`` ->
+        ``num_position_features`` rename in ``Sam2SinePositionEmbedding``). We
+        persist only ``checkpoint``/``device`` and rebuild the weights from the
+        Hub in :meth:`load_context`, matching whatever transformers is loaded.
         """
-        Process the image with points or box prompts using the transformers pipeline.
-        """
-        # 1. Prepare Prompts
-        point_coords = None # Image x Object x point x coords
+        state = self.__dict__.copy()
+        state.pop("model", None)
+        state.pop("processor", None)
+        return state
+
+    def load_context(self, context: Any) -> None:
+        """Runs once when MLflow loads the model; rebuild the HF objects fresh."""
+        self._load_weights()
+
+    def predict(
+        self,
+        context: Any,
+        model_input: list[PromptedSegmentationRequest],
+        params: dict[str, Any] | None = None,
+    ) -> list[Contour]:
+        """Segment one image per request using its 2D prompts."""
+        # MLflow's PyFuncModel.predict(data) passes ``data`` straight through; be
+        # tolerant of either a single request or a list of them.
+        requests = model_input if isinstance(model_input, list) else [model_input]
+        contours: list[Contour] = []
+        for request in requests:
+            previous_mask = request.previous_mask.mask if request.previous_mask else None
+            mask, score = self._segment(request.image, request.prompts, previous_mask)
+            contour = Contour.from_binary_mask(
+                binary_mask=mask,
+                only_return_biggest_contour=True,  # one prompted object per request
+                confidence=score,
+                added_by=request.model_registry_key,
+            )
+            # An empty SAM2 mask yields no contour; skip it so it doesn't poison the
+            # candidate list the backend validates downstream.
+            if contour is not None:
+                contours.append(contour)
+        return contours
+
+    def train(self, request, **kwargs):
+        raise NotImplementedError("SAMPrompted is a pretrained model and is not trainable.")
+
+    def _segment(self, image, prompts: Prompts, previous_mask=None) -> tuple[np.ndarray, float]:
+        """Run SAM2 on a single image with point/box prompts; return (mask, score)."""
+        # 1. Prepare prompts (coords are normalised in the request; scale to pixels).
+        point_coords = None  # Image x Object x point x coords
         point_labels = None
         if prompts.point_prompts:
             point_coords = [[[[int(p.x * image.shape[1]), int(p.y * image.shape[0])] for p in prompts.point_prompts]]]
@@ -44,7 +187,6 @@ class SAMPrompted(Prompted2DBaseModel):
 
         box_coords = None
         if prompts.box_prompt:
-            # Transformers SAM expects [xmin, ymin, xmax, ymax]
             xmin, ymin, xmax, ymax = prompts.box_prompt.xyxy
             xmin = int(xmin * image.shape[1])
             ymin = int(ymin * image.shape[0])
@@ -52,40 +194,102 @@ class SAMPrompted(Prompted2DBaseModel):
             ymax = int(ymax * image.shape[0])
             box_coords = [[[xmin, ymin, xmax, ymax]]]
 
-        # 2. Pre-process Image and Prompts
-        # The processor handles resizing and normalization
+        # A polygon/freehand prompt on its own is SAM2's weakest mode (dense mask
+        # only), which often yields messy or empty masks. When no explicit box was
+        # given, derive the polygon's bounding box as a reliable localisation prompt;
+        # the polygon shape is still applied as the dense mask prompt below.
+        if prompts.polygon_prompt and box_coords is None:
+            xs = [v[0] for v in prompts.polygon_prompt.vertices]
+            ys = [v[1] for v in prompts.polygon_prompt.vertices]
+            box_coords = [[[
+                int(min(xs) * image.shape[1]),
+                int(min(ys) * image.shape[0]),
+                int(max(xs) * image.shape[1]),
+                int(max(ys) * image.shape[0]),
+            ]]]
+
+        # 2. Pre-process image + prompts (the processor handles resize/normalisation).
         inputs = self.processor(
             [image],
             input_points=point_coords,
             input_labels=point_labels,
             input_boxes=box_coords,
-            return_tensors="pt"
+            return_tensors="pt",
         ).to(self.device)
-        _previous_mask = None
-        if previous_mask is not None:
-            _previous_mask = torch.from_numpy(previous_mask).unsqueeze(0).unsqueeze(0).to(self.device).float()
-            _previous_mask = resize(_previous_mask, [256, 256])
 
-        # 3. Inference
-        with torch.no_grad():
-            outputs = self.model(
-                **inputs,
-                input_masks=_previous_mask,
-                multimask_output=True,
+        # Dense mask prompt. Two sources map onto SAM2's single dense input:
+        #   * refinement -> the previous object mask, and
+        #   * a polygon prompt -> rasterised to a mask (SAM2 has no native polygon
+        #     encoder, so a polygon is fed as the dense mask prompt).
+        # When both are present they are OR-combined.
+        mask_prompt = None  # binary {0, 1} mask
+        if previous_mask is not None:
+            mask_prompt = previous_mask.astype(np.uint8)
+        if prompts.polygon_prompt:
+            # Match the polygon raster to the prior's grid when combining, else use
+            # the model's 256x256 dense-prompt grid directly.
+            height, width = mask_prompt.shape[:2] if mask_prompt is not None else (256, 256)
+            polygon_mask = self._polygon_to_mask(prompts.polygon_prompt.vertices, height, width)
+            mask_prompt = polygon_mask if mask_prompt is None else (
+                np.logical_or(mask_prompt, polygon_mask).astype(np.uint8)
             )
 
-        # 4. Post-processing
-        # Convert outputs (low-res masks) to original image size
-        batches = self.processor.post_process_masks(
-            outputs.pred_masks.cpu(),
-            inputs["original_sizes"].cpu()
-        )
+        dense_mask = self._mask_to_logit_prompt(mask_prompt) if mask_prompt is not None else None
 
-        # scores: [batch_size, 1, num_masks]
+        # 3. Inference.
+        with torch.no_grad():
+            outputs = self.model(**inputs, input_masks=dense_mask, multimask_output=True)
+
+        # 4. Post-process: upscale to original size and pick the best-scoring mask.
+        batches = self.processor.post_process_masks(outputs.pred_masks.cpu(), inputs["original_sizes"].cpu())
         scores = outputs.iou_scores.cpu().numpy().squeeze()
-        best_index = np.argmax(scores) # take the mask with the best score
+        best_index = int(np.argmax(scores))
 
-        # masks[0] is [1, 3, H, W] -> taking the first batch and usually the highest score mask
         masks = batches[0].squeeze()
         final_mask = masks[best_index].numpy().astype(np.uint8) * 255
-        return [final_mask], [scores[best_index]]
+        return final_mask, float(scores[best_index])
+
+    @staticmethod
+    def _polygon_to_mask(vertices: list[list[float]], height: int, width: int) -> np.ndarray:
+        """Rasterise a polygon (normalised vertices) into a filled binary mask."""
+        points = np.array(
+            [[int(round(x * width)), int(round(y * height))] for x, y in vertices],
+            dtype=np.int32,
+        )
+        mask = np.zeros((height, width), dtype=np.uint8)
+        cv2.fillPoly(mask, [points], color=1)
+        return mask
+
+    def _mask_to_logit_prompt(self, mask: np.ndarray) -> torch.Tensor:
+        """Turn a binary mask into SAM2's 256x256 dense logit mask prompt.
+
+        The processor squashes the image to a square, so the mask prompt is
+        squashed to the matching 256x256 grid (no aspect-ratio padding). Values
+        are mapped from {0, 1} into logit space because the prompt encoder feeds
+        the mask straight through conv layers without thresholding.
+        """
+        mask_t = torch.from_numpy(mask.astype(np.float32)).unsqueeze(0).unsqueeze(0)
+        mask_t = resize(mask_t, [256, 256])  # bilinear; values land in [0, 1]
+        logits = mask_t * (2.0 * _MASK_PROMPT_LOGIT) - _MASK_PROMPT_LOGIT
+        return logits.to(self.device)
+
+
+# --- Registered variants: each a zero-arg factory the catalog auto-discovers. ---
+@register_model
+def sam2_1_tiny() -> SAMPrompted:
+    return SAMPrompted("sam2-1-tiny")
+
+
+@register_model
+def sam2_1_small() -> SAMPrompted:
+    return SAMPrompted("sam2-1-small")
+
+
+@register_model
+def sam2_1_base_plus() -> SAMPrompted:
+    return SAMPrompted("sam2-1-base-plus")
+
+
+@register_model
+def sam2_1_large() -> SAMPrompted:
+    return SAMPrompted("sam2-1-large")
