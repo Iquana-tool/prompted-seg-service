@@ -7,6 +7,11 @@ from app.routes.inference import router as inference_router
 
 logger = logging.getLogger(__name__)
 
+
+def _device_info() -> dict:
+    """Service-specific health detail (kept here so service-core needs no torch)."""
+    import torch
+
     if torch.cuda.is_available():
         device = f"cuda ({torch.cuda.get_device_name(0)})"
     elif torch.backends.mps.is_available():
@@ -14,6 +19,7 @@ logger = logging.getLogger(__name__)
     else:
         device = "cpu"
     return {"device": device, "torch_version": torch.__version__}
+
 
 def create_app():
     return create_service_app(
@@ -24,4 +30,5 @@ def create_app():
         models_package="models",
         inference_routers=[inference_router],
         hf_login=False,
+        health_extra=_device_info,
     )
