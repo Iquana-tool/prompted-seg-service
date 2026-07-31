@@ -1,4 +1,23 @@
 # Prompted Segmentation
+
+> [!CAUTION]
+> **Deprecated — this service is no longer maintained or deployed.**
+>
+> It has been merged into the unified **[IQUANA AI service](https://github.com/Iquana-tool/ai-service)**,
+> which serves every AI task from one model-centric codebase. The per-task split was dropped because
+> models cross task boundaries (SAM3 does prompted segmentation *and* instance suggestion *and* more),
+> which forced the same model to be reimplemented in up to three repos.
+>
+> **Where this service's functionality lives now:** the `prompted-segmentation` task surface of the
+> unified service, mounted at `http://<host>:8004/prompted-segmentation`. Relative paths are unchanged,
+> so `POST /inference` becomes `POST /prompted-segmentation/inference`. The backend picks this up from a
+> single `AI_SERVICE_URL` setting; drop any `PROMPTED_SEGMENTATION_BACKEND_URL` pin from your `.env`.
+>
+> **Do not add models or features here.** Port them to `ai-service/models/` against the capability-model
+> interface instead.
+>
+> Everything below is kept for historical reference only.
+
 This repo contains the API for the prompted segmentation service of the CORAL tag application.
 
 ## Running the service
